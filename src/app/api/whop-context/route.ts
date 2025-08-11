@@ -68,11 +68,26 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Try to get company ID from experience if not provided
+    let extractedCompanyId = whopCompanyId || companyId
+    if (!extractedCompanyId && extractedExperienceId) {
+      try {
+        // For now, use a known company ID for this experience
+        // In production, you'd fetch this from the Whop API
+        if (extractedExperienceId === 'exp_hxtkjfMPOH3rWW') {
+          extractedCompanyId = 'biz_PHQfLZ3o2GvXQn'
+          console.log('Using known company ID for experience:', extractedCompanyId)
+        }
+      } catch (error) {
+        console.log('Failed to get company ID from experience:', error)
+      }
+    }
+
     // Use headers first, then fallback to URL params, then referrer
     const context = {
       userId: extractedUserId,
       experienceId: extractedExperienceId,
-      companyId: whopCompanyId || companyId || undefined
+      companyId: extractedCompanyId
     }
 
     if (!context.userId || !context.experienceId) {
