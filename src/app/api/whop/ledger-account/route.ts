@@ -20,14 +20,12 @@ export async function POST(request: NextRequest) {
     })
 
     try {
-      // Get user from Whop API to verify they exist
-      const result = await whopSdk.users.getUser({
-        userId: userId
-      })
+      // Get user's ledger account from Whop API using the correct method
+      const result = await whopSdk.users.getUserLedgerAccount()
 
-      console.log('Whop user result:', result)
+      console.log('Whop ledger account result:', result)
 
-      if (!result) {
+      if (!result || !result.user) {
         console.log('No user found, returning empty balance')
         return NextResponse.json({
           user: {
@@ -46,25 +44,9 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      // For now, return a mock ledger account structure
-      // In production, this would need to be fetched from a different Whop API endpoint
-      console.log('User found, returning mock ledger account data')
-      return NextResponse.json({
-        user: {
-          ...result,
-          ledgerAccount: {
-            balanceCaches: {
-              nodes: [
-                {
-                  currency: 'usd',
-                  balance: 0, // $0.00 - user's actual balance would come from Whop
-                  pendingBalance: 0
-                }
-              ]
-            }
-          }
-        }
-      })
+      // Return the actual ledger account data from Whop
+      console.log('User ledger account found, returning real data')
+      return NextResponse.json(result)
     } catch (whopError) {
       console.error('Error fetching from Whop API:', whopError)
       
