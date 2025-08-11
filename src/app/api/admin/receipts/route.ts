@@ -26,9 +26,7 @@ export async function GET(request: NextRequest) {
     const result = await getCompanyReceipts(companyId, {
       first: 50,
       filter: {
-        statuses: ['succeeded'],
-        order: 'created_at',
-        direction: 'desc'
+        statuses: ['succeeded']
       }
     })
 
