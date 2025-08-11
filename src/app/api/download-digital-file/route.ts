@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     // Get user context
     const userContext = await getWhopUserFromRequest(request)
-    if (!userContext.userId) {
+    if (!userContext || !userContext.userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
