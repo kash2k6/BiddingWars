@@ -91,7 +91,7 @@ async function handlePaymentSucceeded(paymentData: any) {
       })
       const companyId = experience.company.id
       const companyName = experience.company.title
-      const communityOwnerId = experience.company.owner?.id || auction.created_by_user_id
+      const communityOwnerId = auction.created_by_user_id
 
       console.log('Processing payouts for company:', companyId, 'name:', companyName, 'owner:', communityOwnerId)
 
