@@ -1,0 +1,117 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseServer } from '@/lib/supabase-server'
+import { 
+  chargeUserForAuction, 
+  calculateCommissionBreakdown, 
+  processPayouts 
+} from '@/lib/payment-system'
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    console.log('POST /api/auctions/[id]/finalize called for auction:', params.id)
+    
+    const body = await request.json()
+    console.log('Request body:', body)
+    
+    // Extract user context from request body
+    const { userId, experienceId, companyId } = body
+    
+    if (!userId || !experienceId) {
+      console.log('Missing userId or experienceId in request body')
+      return NextResponse.json({ error: 'Missing user context' }, { status: 400 })
+    }
+    
+    // Extract actual user ID from JWT if needed
+    let actualUserId = userId
+    if (userId.includes('.')) {
+      try {
+        const payload = JSON.parse(Buffer.from(userId.split('.')[1], 'base64').toString())
+        actualUserId = payload.sub
+        console.log('Extracted user ID from JWT:', actualUserId)
+      } catch (error) {
+        console.log('Failed to parse JWT, using as-is:', userId)
+      }
+    }
+
+    // Get auction data
+    const { data: auction, error: auctionError } = await supabaseServer
+      .from('auctions')
+      .select('*')
+      .eq('id', params.id)
+      .eq('experience_id', experienceId)
+      .single()
+
+    if (auctionError || !auction) {
+      console.error('Error fetching auction:', auctionError)
+      return NextResponse.json({ error: 'Auction not found' }, { status: 404 })
+    }
+
+    // Check if auction is still live
+    if (auction.status !== 'LIVE') {
+      return NextResponse.json({ error: 'Auction is not live' }, { status: 400 })
+    }
+
+    // Get the highest bid
+    const { data: topBid, error: bidError } = await supabaseServer
+      .from('bids')
+      .select('*')
+      .eq('auction_id', params.id)
+      .order('amount_cents', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (bidError || !topBid) {
+      console.error('Error fetching top bid:', bidError)
+      return NextResponse.json({ error: 'No bids found for auction' }, { status: 400 })
+    }
+
+    // Verify the user is the highest bidder
+    if (topBid.bidder_user_id !== actualUserId) {
+      return NextResponse.json({ error: 'You are not the highest bidder' }, { status: 403 })
+    }
+
+    // Calculate total amount (bid + shipping)
+    const totalAmount = topBid.amount_cents + (auction.shipping_cost_cents || 0)
+
+    // Calculate commission breakdown
+    const breakdown = calculateCommissionBreakdown(
+      totalAmount,
+      auction.platform_pct,
+      auction.community_pct
+    )
+
+    // Update auction status to PENDING_PAYMENT
+    const { error: updateError } = await supabaseServer
+      .from('auctions')
+      .update({
+        status: 'PENDING_PAYMENT',
+        winner_user_id: actualUserId,
+        current_bid_id: topBid.id,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', params.id)
+
+    if (updateError) {
+      console.error('Error updating auction:', updateError)
+      return NextResponse.json({ error: 'Failed to update auction' }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      auction: {
+        id: params.id,
+        status: 'PENDING_PAYMENT',
+        winner_user_id: actualUserId,
+        totalAmount,
+        breakdown
+      }
+    })
+
+  } catch (error) {
+    console.error('Error in POST /api/auctions/[id]/finalize:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}

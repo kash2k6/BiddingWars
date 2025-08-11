@@ -1,0 +1,17 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/finalize-auctions",
+      "schedule": "*/5 * * * *"
+    }
+  ],
+  "functions": {
+    "src/app/api/cron/finalize-auctions/route.ts": {
+      "maxDuration": 30
+    }
+  },
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "framework": "nextjs"
+}
