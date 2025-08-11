@@ -26,6 +26,7 @@ interface Auction {
   winner_user_id?: string
   shipping_cost_cents: number
   created_by_user_id: string
+  experience_id: string
 }
 
 export default function MarketplacePage({ params }: { params: { experienceId: string } }) {
