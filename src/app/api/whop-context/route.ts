@@ -50,9 +50,27 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Extract user ID from JWT token if present
+    let extractedUserId = userId
+    if (whopUserToken) {
+      try {
+        // The token is in format: header.payload.signature
+        const parts = whopUserToken.split('.')
+        if (parts.length === 3) {
+          // Decode the payload (second part)
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
+          extractedUserId = payload.sub // 'sub' contains the user ID
+          console.log('Extracted user ID from JWT:', extractedUserId)
+        }
+      } catch (error) {
+        console.log('Failed to parse JWT token, using as-is:', error)
+        extractedUserId = whopUserToken
+      }
+    }
+
     // Use headers first, then fallback to URL params, then referrer
     const context = {
-      userId: whopUserToken || userId,
+      userId: extractedUserId,
       experienceId: extractedExperienceId,
       companyId: whopCompanyId || companyId || undefined
     }
