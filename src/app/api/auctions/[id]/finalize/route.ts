@@ -5,6 +5,7 @@ import {
   calculateCommissionBreakdown, 
   processPayouts 
 } from '@/lib/payment-system'
+import { WhopServerSdk } from '@whop/api'
 
 export async function POST(
   request: NextRequest,
@@ -83,6 +84,33 @@ export async function POST(
       auction.community_pct
     )
 
+    // Create Whop SDK instance for the user
+    const whopSdk = WhopServerSdk({
+      appId: process.env.NEXT_PUBLIC_WHOP_APP_ID!,
+      appApiKey: process.env.WHOP_API_KEY!,
+      onBehalfOfUserId: actualUserId
+    })
+
+    // Create the charge using Whop API
+    const chargeResult = await whopSdk.payments.chargeUser({
+      amount: totalAmount,
+      currency: 'usd' as any,
+      userId: actualUserId,
+      description: `Payment for auction: ${auction.title}`,
+      metadata: {
+        auctionId: params.id,
+        experienceId,
+        bidId: topBid.id,
+        breakdown
+      }
+    })
+
+    console.log('Charge result:', chargeResult)
+
+    if (!chargeResult) {
+      return NextResponse.json({ error: 'Failed to create charge' }, { status: 500 })
+    }
+
     // Update auction status to PENDING_PAYMENT
     const { error: updateError } = await supabaseServer
       .from('auctions')
@@ -90,6 +118,7 @@ export async function POST(
         status: 'PENDING_PAYMENT',
         winner_user_id: actualUserId,
         current_bid_id: topBid.id,
+        payment_id: chargeResult.inAppPurchase?.id || chargeResult.inAppPurchase?.planId,
         updated_at: new Date().toISOString()
       })
       .eq('id', params.id)
@@ -99,8 +128,14 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to update auction' }, { status: 500 })
     }
 
+    // Return the inAppPurchase object for the frontend
     return NextResponse.json({
       success: true,
+      inAppPurchase: {
+        planId: chargeResult.inAppPurchase?.planId || 'fallback-plan-id',
+        sessionId: chargeResult.inAppPurchase?.id,
+        receiptId: chargeResult.inAppPurchase?.id
+      },
       auction: {
         id: params.id,
         status: 'PENDING_PAYMENT',

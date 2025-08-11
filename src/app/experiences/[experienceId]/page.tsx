@@ -34,6 +34,7 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
   const [currentBids, setCurrentBids] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -56,6 +57,7 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
         
         console.log('Setting currentUserId to:', actualUserId)
         setCurrentUserId(actualUserId)
+        setCurrentCompanyId(ctx.companyId || null)
       } catch (error) {
         console.error("Failed to get Whop context:", error)
       }
@@ -206,6 +208,11 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
           'x-whop-user-token': currentUserId || '',
           'x-whop-experience-id': params.experienceId,
         },
+        body: JSON.stringify({
+          userId: currentUserId,
+          experienceId: params.experienceId,
+          companyId: currentCompanyId
+        })
       })
 
       const result = await response.json()
@@ -216,22 +223,15 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
 
       // Open Whop payment modal
       const { createInAppPurchase } = await import("@/lib/whop-iframe")
-      try {
-        await createInAppPurchase(result.inAppPurchase.planId)
-        
-        toast({
-          title: "Purchase Complete!",
-          description: "You have successfully purchased this item.",
-        })
-      } catch (paymentError) {
-        // For now, show a message that the payment system is being updated
-        toast({
-          title: "Payment System Update",
-          description: "The payment system is being updated. Please try again later.",
-          variant: "destructive",
-        })
-        throw paymentError
-      }
+      await createInAppPurchase(result.inAppPurchase.planId)
+      
+      toast({
+        title: "Purchase Complete!",
+        description: "You have successfully purchased this item.",
+      })
+
+      // Refresh the page to update the UI
+      window.location.reload()
     } catch (error) {
       console.error('Error buying now:', error)
       toast({

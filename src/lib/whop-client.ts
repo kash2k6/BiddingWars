@@ -20,25 +20,19 @@ export async function getIframeContext() {
       }
     }
 
-    // Import dynamically to avoid SSR issues
-    // const { WhopClientSdk } = await import('@whop/api')
-    // const whopClient = WhopClientSdk()
-
-    // Try to get context from Whop SDK
-    // const context = await whopClient.iframe.getContext()
-    
-    // For now, throw an error since the SDK structure has changed
-    throw new Error('Whop client SDK structure has changed - need to update implementation')
+    // Use the iframe SDK instead of client SDK for context
+    const { getIframeContext: getIframeContextFromSDK } = await import('@/lib/whop-iframe')
+    const context = await getIframeContextFromSDK()
     
     // If we get here, we have a valid context
-    // console.log('Whop context retrieved successfully:', context)
+    console.log('Whop context retrieved successfully:', context)
     
     // Store for development
-    // if (process.env.NODE_ENV === 'development') {
-    //   localStorage.setItem('whop-context', JSON.stringify(context))
-    // }
+    if (process.env.NODE_ENV === 'development') {
+      localStorage.setItem('whop-context', JSON.stringify(context))
+    }
     
-    // return context
+    return context
   } catch (error) {
     console.error('Failed to get Whop iframe context:', error)
     
@@ -67,16 +61,21 @@ export async function getIframeContext() {
 // Function to get user ledger account
 export async function getUserLedgerAccount(userId: string) {
   try {
-    // const { WhopClientSdk } = await import('@whop/api')
-    // const whopClient = WhopClientSdk()
+    // Use the server API instead of client SDK for ledger account
+    const response = await fetch('/api/whop/ledger-account', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId })
+    })
     
-    // const result = await whopClient.users.getUserLedgerAccount({
-    //   userId,
-    // })
-    // return result
+    if (!response.ok) {
+      throw new Error('Failed to fetch ledger account')
+    }
     
-    // For now, return mock data since the SDK structure has changed
-    throw new Error('Whop client SDK structure has changed - need to update implementation')
+    const result = await response.json()
+    return result
   } catch (error) {
     console.error('Failed to get user ledger account:', error)
     throw error
@@ -86,16 +85,10 @@ export async function getUserLedgerAccount(userId: string) {
 // Function to create in-app purchase
 export async function createInAppPurchase(planId: string) {
   try {
-    // const { WhopClientSdk } = await import('@whop/api')
-    // const whopClient = WhopClientSdk()
-    
-    // const result = await whopClient.iframe.inAppPurchase({
-    //   planId,
-    // })
-    // return result
-    
-    // For now, return mock data since the SDK structure has changed
-    throw new Error('Whop client SDK structure has changed - need to update implementation')
+    // Use the iframe SDK instead of client SDK for in-app purchases
+    const { createInAppPurchase: createInAppPurchaseFromSDK } = await import('@/lib/whop-iframe')
+    const result = await createInAppPurchaseFromSDK(planId)
+    return result
   } catch (error) {
     console.error('Failed to create in-app purchase:', error)
     throw error

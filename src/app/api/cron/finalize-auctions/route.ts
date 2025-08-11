@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
 import { notifyAuctionEnded } from '@/lib/notifications'
+import { calculateCommissionBreakdown } from '@/lib/payment-system'
+import { WhopServerSdk } from '@whop/api'
 
 export async function POST(request: NextRequest) {
   try {
@@ -65,13 +67,56 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Update auction with winner and status
+        // Calculate total amount (bid + shipping)
+        const totalAmount = topBid.amount_cents + (auction.shipping_cost_cents || 0)
+
+        // Calculate commission breakdown
+        const breakdown = calculateCommissionBreakdown(
+          totalAmount,
+          auction.platform_pct,
+          auction.community_pct
+        )
+
+        console.log(`Charging winner ${topBid.bidder_user_id} for auction ${auction.id}: $${totalAmount/100}`)
+
+        // Create Whop SDK instance for the winner
+        const whopSdk = WhopServerSdk({
+          appId: process.env.NEXT_PUBLIC_WHOP_APP_ID!,
+          appApiKey: process.env.WHOP_API_KEY!,
+          onBehalfOfUserId: topBid.bidder_user_id
+        })
+
+        // Create the charge using Whop API
+        const chargeResult = await whopSdk.payments.chargeUser({
+          amount: totalAmount,
+          currency: 'usd' as any,
+          userId: topBid.bidder_user_id,
+          description: `Payment for auction: ${auction.title}`,
+          metadata: {
+            auctionId: auction.id,
+            experienceId: auction.experience_id,
+            bidId: topBid.id,
+            breakdown,
+            type: 'auction_payment'
+          }
+        })
+
+        console.log('Charge result:', chargeResult)
+
+        if (!chargeResult) {
+          console.error(`Failed to create charge for auction ${auction.id}`)
+          errors.push(`Failed to create charge for auction ${auction.id}`)
+          continue
+        }
+
+        // Update auction with winner, status, and payment info
         const { error: updateError } = await supabaseServer
           .from('auctions')
           .update({
             status: 'PENDING_PAYMENT',
             winner_user_id: topBid.bidder_user_id,
             current_bid_id: topBid.id,
+            payment_id: chargeResult.inAppPurchase?.id || chargeResult.inAppPurchase?.planId,
             updated_at: new Date().toISOString()
           })
           .eq('id', auction.id)
@@ -90,7 +135,7 @@ export async function POST(request: NextRequest) {
           // Don't fail the entire process for notification errors
         }
 
-        console.log(`Auction ${auction.id} finalized with winner ${topBid.bidder_user_id}`)
+        console.log(`Auction ${auction.id} finalized with winner ${topBid.bidder_user_id} - Payment created`)
         finalizedCount++
 
       } catch (error) {

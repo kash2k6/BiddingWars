@@ -47,15 +47,43 @@ export interface PayoutRequest {
 }
 
 /**
- * Charge a user for winning an auction
+ * Charge a user for winning an auction - money goes to company ledger
  */
 export async function chargeUserForAuction(paymentRequest: PaymentRequest): Promise<PaymentResult> {
   try {
     console.log('Charging user for auction:', paymentRequest)
 
+    // Get the experience to find the company ID
+    const { WhopServerSdk } = await import('@whop/api')
+    
+    // Create a fresh SDK instance without onBehalfOfUserId to get experience details
+    const experienceSdk = WhopServerSdk({
+      appId: process.env.NEXT_PUBLIC_WHOP_APP_ID!,
+      appApiKey: process.env.WHOP_API_KEY!,
+    })
+    
+    const experience = await experienceSdk.experiences.getExperience({ 
+      experienceId: paymentRequest.metadata.experienceId 
+    })
+    const companyId = experience.company.id
+
+    console.log('Found company ID:', companyId)
+
+    // Get your company's ledger account
+    const ledgerAccount = await experienceSdk.companies.getCompanyLedgerAccount({
+      companyId,
+    })
+
+    console.log('Company ledger account:', ledgerAccount)
+
+    if (!ledgerAccount || !ledgerAccount.ledgerAccount?.id) {
+      throw new Error('No ledger account found for company')
+    }
+
     // Create a Whop SDK instance for the specific user
     const userSdk = createWhopClient(paymentRequest.userId)
 
+    // Charge the user - money goes to YOUR company's ledger account
     const result = await userSdk.payments.chargeUser({
       amount: paymentRequest.amount,
       currency: paymentRequest.currency as any,
@@ -214,18 +242,22 @@ export async function payUser(payoutRequest: PayoutRequest): Promise<void> {
       throw new Error('No ledger account found for company')
     }
 
-    // Pay the recipient
-    await whopSdk.payments.payUser({
+    // Pay the recipient using the Pay User API
+    await experienceSdk.payments.payUser({
       amount: payoutRequest.amount,
       currency: payoutRequest.currency as any,
-      // Username or ID or ledger account ID of the recipient user
+      // The ID of the destination (either a User tag, Bot tag, or LedgerAccount tag)
       destinationId: payoutRequest.userId,
-      // Your company's ledger account ID
+      // The ledger account id to transfer from (your company's account)
       ledgerAccountId: ledgerAccount.ledgerAccount.id,
-      // Optional transfer fee in percentage
-      transferFee: ledgerAccount.ledgerAccount.transferFee,
-      // Required idempotence key to prevent duplicate transfers
+      // A unique key to ensure idempotence
       idempotenceKey: `payout_${payoutRequest.metadata.auctionId}_${payoutRequest.metadata.type}_${Date.now()}`,
+      // Notes for the transfer (max 50 characters)
+      notes: payoutRequest.description.substring(0, 50),
+      // The reason for the transfer
+      reason: 'user_to_creator' as any,
+      // The fee that the client thinks it is being charged for the transfer
+      transferFee: ledgerAccount.ledgerAccount.transferFee,
     })
 
     console.log('Pay user successful')
