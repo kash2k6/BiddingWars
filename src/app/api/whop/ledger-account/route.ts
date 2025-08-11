@@ -13,10 +13,11 @@ export async function POST(request: NextRequest) {
 
     console.log('Fetching ledger account for user:', userId, 'company:', companyId)
 
-    // Initialize Whop SDK
+    // Initialize Whop SDK with the user ID we're acting on behalf of
     const whopSdk = WhopServerSdk({
       appId: process.env.NEXT_PUBLIC_WHOP_APP_ID!,
-      appApiKey: process.env.WHOP_API_KEY!
+      appApiKey: process.env.WHOP_API_KEY!,
+      onBehalfOfUserId: userId
     })
 
     try {
