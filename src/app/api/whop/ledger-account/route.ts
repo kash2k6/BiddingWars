@@ -15,7 +15,8 @@ export async function POST(request: NextRequest) {
 
     // Initialize Whop SDK
     const whopSdk = WhopServerSdk({
-      apiKey: process.env.WHOP_API_KEY!
+      appId: process.env.NEXT_PUBLIC_WHOP_APP_ID!,
+      appApiKey: process.env.WHOP_API_KEY!
     })
 
     try {
