@@ -97,21 +97,21 @@ export async function POST(
       .eq('id', params.id)
       .single()
 
-    // Send notifications
-    if (auction) {
+    // Send bid alerts to previous highest bidder
+    if (previousTopBid && previousTopBid.bidder_user_id !== actualUserId) {
       try {
-        const { notifyNewBid, notifyOutbid } = await import('@/lib/notifications')
-        
-        // Notify everyone about the new bid
-        await notifyNewBid(auction, amountCents, actualUserId, experienceId)
-        
-        // If there was a previous highest bidder and it's not the same user, notify them they were outbid
-        if (previousTopBid && previousTopBid.bidder_user_id !== actualUserId) {
-          await notifyOutbid(auction, previousTopBid.bidder_user_id, experienceId)
-        }
-      } catch (notificationError) {
-        console.error('Error sending notifications:', notificationError)
-        // Don't fail the bid for notification errors
+        const { sendBidAlert } = await import('@/lib/notifications')
+        await sendBidAlert(
+          previousTopBid.bidder_user_id,
+          params.id,
+          auction?.title || 'Auction',
+          previousTopBid.amount_cents || 0,
+          amountCents
+        )
+        console.log('Bid alert sent to previous highest bidder')
+      } catch (error) {
+        console.error('Failed to send bid alert:', error)
+        // Don't fail the bid if notification fails
       }
     }
     

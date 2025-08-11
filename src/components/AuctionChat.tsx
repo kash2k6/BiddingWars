@@ -1,13 +1,13 @@
-"use client"
+'use client'
 
-import { useState, useEffect, useRef } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Send, MessageCircle, Users } from "lucide-react"
-import { supabaseClient } from "@/lib/supabase-client"
-import { useToast } from "@/hooks/use-toast"
+import { useState, useEffect, useRef } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Send, MessageCircle } from 'lucide-react'
+import { supabase } from '@/lib/supabase-client'
 
 interface ChatMessage {
   id: string
@@ -15,56 +15,70 @@ interface ChatMessage {
   user_id: string
   user_name?: string
   message: string
+  experience_id: string
   created_at: string
 }
 
 interface AuctionChatProps {
   auctionId: string
-  currentUserId: string
   experienceId: string
+  currentUserId: string
+  currentUserName?: string
+  isWinner: boolean
+  isSeller: boolean
 }
 
-export function AuctionChat({ auctionId, currentUserId, experienceId }: AuctionChatProps) {
+export default function AuctionChat({
+  auctionId,
+  experienceId,
+  currentUserId,
+  currentUserName,
+  isWinner,
+  isSeller
+}: AuctionChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [newMessage, setNewMessage] = useState("")
+  const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(false)
-  const [onlineUsers, setOnlineUsers] = useState(1)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const { toast } = useToast()
+  const [subscribed, setSubscribed] = useState(false)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
 
-  // Scroll to bottom when new messages arrive
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  // Only show chat if user is winner or seller
+  if (!isWinner && !isSeller) {
+    return null
   }
 
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
-
-  // Fetch existing messages
-  useEffect(() => {
-    async function fetchMessages() {
-      try {
-        const { data, error } = await supabaseClient
-          .from('auction_chat')
-          .select('*')
-          .eq('auction_id', auctionId)
-          .order('created_at', { ascending: true })
-          .limit(50)
-
-        if (error) throw error
-        setMessages(data || [])
-      } catch (error) {
-        console.error('Error fetching messages:', error)
+    fetchMessages()
+    subscribeToMessages()
+    
+    return () => {
+      if (subscribed) {
+        supabase.removeAllSubscriptions()
       }
     }
-
-    fetchMessages()
   }, [auctionId])
 
-  // Subscribe to real-time messages
-  useEffect(() => {
-    const channel = supabaseClient
+  const fetchMessages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('auction_chat')
+        .select('*')
+        .eq('auction_id', auctionId)
+        .order('created_at', { ascending: true })
+
+      if (error) {
+        console.error('Error fetching messages:', error)
+        return
+      }
+
+      setMessages(data || [])
+    } catch (error) {
+      console.error('Error fetching messages:', error)
+    }
+  }
+
+  const subscribeToMessages = () => {
+    const subscription = supabase
       .channel(`auction-chat-${auctionId}`)
       .on(
         'postgres_changes',
@@ -75,44 +89,46 @@ export function AuctionChat({ auctionId, currentUserId, experienceId }: AuctionC
           filter: `auction_id=eq.${auctionId}`
         },
         (payload) => {
-          setMessages(prev => [...prev, payload.new as ChatMessage])
+          const newMessage = payload.new as ChatMessage
+          setMessages(prev => [...prev, newMessage])
+          
+          // Auto-scroll to bottom
+          setTimeout(() => {
+            if (scrollAreaRef.current) {
+              scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight
+            }
+          }, 100)
         }
       )
       .subscribe()
 
-    return () => {
-      supabaseClient.removeChannel(channel)
-    }
-  }, [auctionId])
+    setSubscribed(true)
+    return subscription
+  }
 
   const sendMessage = async () => {
     if (!newMessage.trim()) return
 
     setLoading(true)
     try {
-      const { error } = await supabaseClient
+      const { error } = await supabase
         .from('auction_chat')
         .insert({
           auction_id: auctionId,
           user_id: currentUserId,
+          user_name: currentUserName || 'Anonymous',
           message: newMessage.trim(),
           experience_id: experienceId
         })
 
-      if (error) throw error
+      if (error) {
+        console.error('Error sending message:', error)
+        return
+      }
 
-      setNewMessage("")
-      toast({
-        title: "Message sent!",
-        description: "Your message has been posted to the chat.",
-      })
+      setNewMessage('')
     } catch (error) {
       console.error('Error sending message:', error)
-      toast({
-        title: "Error",
-        description: "Failed to send message. Please try again.",
-        variant: "destructive",
-      })
     } finally {
       setLoading(false)
     }
@@ -125,74 +141,103 @@ export function AuctionChat({ auctionId, currentUserId, experienceId }: AuctionC
     }
   }
 
+  const formatTime = (timestamp: string) => {
+    return new Date(timestamp).toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    })
+  }
+
+  const getUserInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
   return (
-    <Card className="h-96 flex flex-col">
+    <Card className="w-full max-w-2xl mx-auto">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-lg">
           <MessageCircle className="h-5 w-5" />
-          Live Chat
-          <Badge variant="secondary" className="ml-auto">
-            <Users className="h-3 w-3 mr-1" />
-            {onlineUsers} online
-          </Badge>
+          Auction Chat
+          {(isWinner || isSeller) && (
+            <span className="text-sm text-muted-foreground">
+              {isWinner && isSeller ? '(You are both winner and seller)' : 
+               isWinner ? '(You won this auction)' : '(You created this auction)'}
+            </span>
+          )}
         </CardTitle>
       </CardHeader>
-      
-      <CardContent className="flex-1 flex flex-col p-0">
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-64">
+      <CardContent className="space-y-4">
+        {/* Messages */}
+        <ScrollArea 
+          ref={scrollAreaRef}
+          className="h-64 w-full border rounded-md p-4"
+        >
           {messages.length === 0 ? (
             <div className="text-center text-muted-foreground py-8">
-              <MessageCircle className="h-8 w-8 mx-auto mb-2" />
-              <p>No messages yet. Start the conversation!</p>
+              No messages yet. Start the conversation!
             </div>
           ) : (
-            messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.user_id === currentUserId ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-xs lg:max-w-md px-3 py-2 rounded-lg ${
-                    message.user_id === currentUserId
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-800'
-                  }`}
-                >
-                  <div className="text-xs opacity-75 mb-1">
-                    {message.user_name || 'Anonymous'}
+            <div className="space-y-3">
+              {messages.map((message) => {
+                const isOwnMessage = message.user_id === currentUserId
+                return (
+                  <div
+                    key={message.id}
+                    className={`flex gap-3 ${isOwnMessage ? 'flex-row-reverse' : ''}`}
+                  >
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="text-xs">
+                        {getUserInitials(message.user_name || 'User')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-medium">
+                          {message.user_name || 'Anonymous'}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatTime(message.created_at)}
+                        </span>
+                      </div>
+                      <div
+                        className={`px-3 py-2 rounded-lg max-w-xs break-words ${
+                          isOwnMessage
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted'
+                        }`}
+                      >
+                        {message.message}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-sm">{message.message}</div>
-                  <div className="text-xs opacity-75 mt-1">
-                    {new Date(message.created_at).toLocaleTimeString()}
-                  </div>
-                </div>
-              </div>
-            ))
+                )
+              })}
+            </div>
           )}
-          <div ref={messagesEndRef} />
-        </div>
+        </ScrollArea>
 
-        {/* Input Area */}
-        <div className="p-4 border-t">
-          <div className="flex gap-2">
-            <Input
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Type your message..."
-              disabled={loading}
-              className="flex-1"
-            />
-            <Button
-              onClick={sendMessage}
-              disabled={loading || !newMessage.trim()}
-              size="sm"
-              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
+        {/* Message Input */}
+        <div className="flex gap-2">
+          <Input
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="Type your message..."
+            disabled={loading}
+            className="flex-1"
+          />
+          <Button
+            onClick={sendMessage}
+            disabled={loading || !newMessage.trim()}
+            size="icon"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
         </div>
       </CardContent>
     </Card>

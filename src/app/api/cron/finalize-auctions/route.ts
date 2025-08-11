@@ -47,25 +47,39 @@ export async function POST(request: NextRequest) {
           .limit(1)
           .single()
 
-        if (bidError || !topBid) {
-          // No bids, mark as ENDED
-          const { error: updateError } = await supabaseServer
-            .from('auctions')
-            .update({
-              status: 'ENDED',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', auction.id)
+                  if (bidError || !topBid) {
+            // No bids, mark as ENDED
+            const { error: updateError } = await supabaseServer
+              .from('auctions')
+              .update({
+                status: 'ENDED',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', auction.id)
 
-          if (updateError) {
-            console.error(`Error updating auction ${auction.id}:`, updateError)
-            errors.push(`Failed to update auction ${auction.id}`)
-          } else {
-            console.log(`Auction ${auction.id} ended with no bids`)
-            finalizedCount++
+            if (updateError) {
+              console.error(`Error updating auction ${auction.id}:`, updateError)
+              errors.push(`Failed to update auction ${auction.id}`)
+            } else {
+              console.log(`Auction ${auction.id} ended with no bids`)
+              
+              // Send notification to seller about no bids
+              try {
+                const { sendAuctionEndedNoBidsNotification } = await import('@/lib/notifications')
+                await sendAuctionEndedNoBidsNotification(
+                  auction.created_by_user_id,
+                  auction.id,
+                  auction.title
+                )
+                console.log('No bids notification sent for auction:', auction.id)
+              } catch (notificationError) {
+                console.error('Failed to send no bids notification for auction:', auction.id, notificationError)
+              }
+              
+              finalizedCount++
+            }
+            continue
           }
-          continue
-        }
 
         // Calculate total amount (bid + shipping)
         const totalAmount = topBid.amount_cents + (auction.shipping_cost_cents || 0)
@@ -129,10 +143,48 @@ export async function POST(request: NextRequest) {
 
         // Send notifications
         try {
-          await notifyAuctionEnded(auction, topBid.bidder_user_id, auction.experience_id)
+          const { 
+            sendAuctionWonNotification, 
+            sendAuctionSoldNotification,
+            notifyAuctionEnded
+          } = await import('@/lib/notifications')
+          
+          // Notify winner
+          await sendAuctionWonNotification(
+            topBid.bidder_user_id,
+            auction.id,
+            auction.title,
+            totalAmount
+          )
+          
+          // Notify seller
+          await sendAuctionSoldNotification(
+            auction.created_by_user_id,
+            auction.id,
+            auction.title,
+            totalAmount
+          )
+          
+          // Get all bidders to notify losers
+          const { data: allBids } = await supabaseServer
+            .from('bids')
+            .select('bidder_user_id')
+            .eq('auction_id', auction.id)
+          
+          if (allBids) {
+            const allBidderIds = Array.from(new Set(allBids.map(bid => bid.bidder_user_id)))
+            await notifyAuctionEnded(
+              auction.id,
+              auction.title,
+              topBid.bidder_user_id,
+              allBidderIds
+            )
+          }
+          
+          console.log('Notifications sent for auction:', auction.id)
         } catch (notificationError) {
-          console.error(`Error sending notification for auction ${auction.id}:`, notificationError)
-          // Don't fail the entire process for notification errors
+          console.error('Failed to send notifications for auction:', auction.id, notificationError)
+          // Don't fail the auction finalization for notification errors
         }
 
         console.log(`Auction ${auction.id} finalized with winner ${topBid.bidder_user_id} - Payment created`)

@@ -1,162 +1,143 @@
-
-
-export interface NotificationData {
-  title: string
-  content: string
-  experienceId: string
-  restPath?: string
-  userIds?: string[]
-  isMention?: boolean
-  senderUserId?: string
-}
+import { WhopServerSdk } from '@whop/api'
 
 /**
- * Send a push notification using Whop's notification system
+ * Send push notification to a user
  */
-export async function sendPushNotification(data: NotificationData) {
+export async function sendPushNotification(
+  userId: string,
+  title: string,
+  body: string,
+  data?: Record<string, any>
+) {
   try {
-    console.log('Sending push notification:', data)
+    console.log(`Sending push notification to ${userId}: ${title}`)
     
-    // Create a fresh SDK instance for notifications
-    const { WhopServerSdk } = await import('@whop/api')
     const whopSdk = WhopServerSdk({
       appId: process.env.NEXT_PUBLIC_WHOP_APP_ID!,
       appApiKey: process.env.WHOP_API_KEY!,
+      onBehalfOfUserId: userId
     })
 
     const result = await whopSdk.notifications.sendPushNotification({
-      title: data.title,
-      content: data.content,
-      experienceId: data.experienceId,
-      restPath: data.restPath,
-      userIds: data.userIds,
-      isMention: data.isMention || false,
-      senderUserId: data.senderUserId,
+      userId,
+      title,
+      body,
+      data: data || {}
     })
 
     console.log('Push notification sent successfully:', result)
-    return { success: true, result }
+    return result
   } catch (error) {
-    console.error('Error sending push notification:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    console.error('Failed to send push notification:', error)
+    throw error
   }
 }
 
 /**
- * Send notification when a new auction is created
+ * Send bid alert when user is outbid
  */
-export async function notifyNewAuction(auction: any, experienceId: string) {
-  return sendPushNotification({
-    title: "🔥 New Auction Alert!",
-    content: `"${auction.title}" - Starting at ${(auction.start_price_cents / 100).toFixed(2)}`,
-    experienceId,
-    restPath: `/auction/${auction.id}`,
-    isMention: false,
+export async function sendBidAlert(
+  outbidUserId: string,
+  auctionId: string,
+  auctionTitle: string,
+  currentBid: number,
+  newBid: number
+) {
+  const title = "🚨 You've been outbid!"
+  const body = `Someone bid $${(newBid / 100).toFixed(2)} on "${auctionTitle}"`
+  
+  await sendPushNotification(outbidUserId, title, body, {
+    type: 'bid_alert',
+    auctionId,
+    currentBid,
+    newBid,
+    auctionTitle
   })
 }
 
 /**
- * Send notification when someone places a bid
+ * Send auction ended notification to winner
  */
-export async function notifyNewBid(auction: any, bidAmount: number, bidderUserId: string, experienceId: string) {
-  return sendPushNotification({
-    title: "💥 New Bid Placed!",
-    content: `"${auction.title}" - New bid: $${(bidAmount / 100).toFixed(2)}`,
-    experienceId,
-    restPath: `/auction/${auction.id}`,
-    isMention: true,
-    senderUserId: bidderUserId,
+export async function sendAuctionWonNotification(
+  winnerUserId: string,
+  auctionId: string,
+  auctionTitle: string,
+  winningBid: number
+) {
+  const title = "🎉 You won the auction!"
+  const body = `Congratulations! You won "${auctionTitle}" for $${(winningBid / 100).toFixed(2)}`
+  
+  await sendPushNotification(winnerUserId, title, body, {
+    type: 'auction_won',
+    auctionId,
+    winningBid,
+    auctionTitle
   })
 }
 
 /**
- * Send notification when someone is outbid
+ * Send auction ended notification to seller
  */
-export async function notifyOutbid(auction: any, oldHighestBidderUserId: string, experienceId: string) {
-  return sendPushNotification({
-    title: "😱 You've Been Outbid!",
-    content: `"${auction.title}" - Someone just outbid you!`,
-    experienceId,
-    restPath: `/auction/${auction.id}`,
-    userIds: [oldHighestBidderUserId],
-    isMention: true,
+export async function sendAuctionSoldNotification(
+  sellerUserId: string,
+  auctionId: string,
+  auctionTitle: string,
+  winningBid: number
+) {
+  const title = "💰 Your auction sold!"
+  const body = `"${auctionTitle}" sold for $${(winningBid / 100).toFixed(2)}`
+  
+  await sendPushNotification(sellerUserId, title, body, {
+    type: 'auction_sold',
+    auctionId,
+    winningBid,
+    auctionTitle
   })
 }
 
 /**
- * Send notification when auction ends
+ * Send auction ended notification when no bids
  */
-export async function notifyAuctionEnded(auction: any, winnerUserId: string, experienceId: string) {
-  // Notify the winner
-  await sendPushNotification({
-    title: "🎉 You Won the Auction!",
-    content: `"${auction.title}" - Congratulations! Complete your payment now.`,
-    experienceId,
-    restPath: `/auction/${auction.id}`,
-    userIds: [winnerUserId],
-    isMention: true,
-  })
-
-  // Notify the seller
-  await sendPushNotification({
-    title: "💰 Auction Sold!",
-    content: `"${auction.title}" - Your auction has ended and payment is pending.`,
-    experienceId,
-    restPath: `/auction/${auction.id}`,
-    userIds: [auction.created_by_user_id],
-    isMention: true,
+export async function sendAuctionEndedNoBidsNotification(
+  sellerUserId: string,
+  auctionId: string,
+  auctionTitle: string
+) {
+  const title = "⏰ Auction ended"
+  const body = `"${auctionTitle}" ended with no bids`
+  
+  await sendPushNotification(sellerUserId, title, body, {
+    type: 'auction_ended_no_bids',
+    auctionId,
+    auctionTitle
   })
 }
 
 /**
- * Send notification when payment is completed
+ * Notify all bidders when auction ends (except winner)
  */
-export async function notifyPaymentCompleted(auction: any, experienceId: string) {
-  // Notify the seller
-  await sendPushNotification({
-    title: "✅ Payment Received!",
-    content: `"${auction.title}" - Payment completed! Time to fulfill the order.`,
-    experienceId,
-    restPath: `/auction/${auction.id}`,
-    userIds: [auction.created_by_user_id],
-    isMention: true,
-  })
-
-  // Notify the buyer
-  await sendPushNotification({
-    title: "📦 Item Ready for Delivery!",
-    content: `"${auction.title}" - Payment confirmed! Your item will be shipped soon.`,
-    experienceId,
-    restPath: `/auction/${auction.id}`,
-    userIds: [auction.winner_user_id],
-    isMention: true,
-  })
-}
-
-/**
- * Send notification when item is shipped
- */
-export async function notifyItemShipped(auction: any, experienceId: string) {
-  return sendPushNotification({
-    title: "🚚 Item Shipped!",
-    content: `"${auction.title}" - Your item is on its way!`,
-    experienceId,
-    restPath: `/auction/${auction.id}`,
-    userIds: [auction.winner_user_id],
-    isMention: true,
-  })
-}
-
-/**
- * Send notification when item is received
- */
-export async function notifyItemReceived(auction: any, experienceId: string) {
-  return sendPushNotification({
-    title: "📦 Item Received!",
-    content: `"${auction.title}" - Transaction completed successfully!`,
-    experienceId,
-    restPath: `/auction/${auction.id}`,
-    userIds: [auction.created_by_user_id],
-    isMention: true,
-  })
+export async function notifyAuctionEnded(
+  auctionId: string,
+  auctionTitle: string,
+  winnerUserId: string,
+  allBidderIds: string[]
+) {
+  const title = "⏰ Auction ended"
+  const body = `"${auctionTitle}" has ended`
+  
+  // Send to all bidders except winner
+  const losers = allBidderIds.filter(id => id !== winnerUserId)
+  
+  for (const bidderId of losers) {
+    try {
+      await sendPushNotification(bidderId, title, body, {
+        type: 'auction_ended',
+        auctionId,
+        auctionTitle,
+        won: false
+      })
+    } catch (error) {
+      console.error(`Failed to notify bidder ${bidderId}:`, error)
+    }
+  }
 }

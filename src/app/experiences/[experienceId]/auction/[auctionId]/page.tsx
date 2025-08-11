@@ -16,6 +16,7 @@ import { Countdown } from "@/components/Countdown"
 import { ExcitingBidButton } from "@/components/ExcitingBidButton"
 import { PaymentHandler } from "@/components/PaymentHandler"
 import { DigitalProductDelivery } from "@/components/DigitalProductDelivery"
+import AuctionChat from "@/components/AuctionChat"
 import { 
   Clock, 
   DollarSign, 
@@ -67,26 +68,17 @@ interface Bid {
   bidder_name?: string
 }
 
-interface ChatMessage {
-  id: string
-  user_id: string
-  message: string
-  created_at: string
-  user_name?: string
-}
+
 
 export default function AuctionDetailPage() {
   const params = useParams()
   const { toast } = useToast()
   const [auction, setAuction] = useState<Auction | null>(null)
   const [bids, setBids] = useState<Bid[]>([])
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [newBidAmount, setNewBidAmount] = useState<number>(0)
-  const [chatMessage, setChatMessage] = useState("")
   const [notifications, setNotifications] = useState<string[]>([])
-  const chatEndRef = useRef<HTMLDivElement>(null)
   const notificationsEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -298,34 +290,7 @@ export default function AuctionDetailPage() {
     }
   }
 
-  const handleSendChat = async () => {
-    if (!chatMessage.trim() || !currentUserId || !auction) return
 
-    try {
-      const newMessage: ChatMessage = {
-        id: Date.now().toString(),
-        user_id: currentUserId,
-        message: chatMessage.trim(),
-        created_at: new Date().toISOString(),
-      }
-
-      setChatMessages(prev => [...prev, newMessage])
-      setChatMessage("")
-      
-      // Scroll to bottom
-      setTimeout(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-      }, 100)
-
-    } catch (error) {
-      console.error('Error sending message:', error)
-      toast({
-        title: "Error",
-        description: "Failed to send message",
-        variant: "destructive",
-      })
-    }
-  }
 
   const isLive = auction?.status === 'LIVE'
   const isEnded = auction?.status === 'ENDED'
@@ -596,50 +561,17 @@ export default function AuctionDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Chat */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageCircle className="h-5 w-5 text-blue-500" />
-                War Room Chat
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="max-h-48 overflow-y-auto space-y-2">
-                {chatMessages.length === 0 ? (
-                  <p className="text-gray-400 text-sm">No messages yet...</p>
-                ) : (
-                  chatMessages.map((message) => (
-                    <div key={message.id} className="p-2 bg-gray-800/50 rounded">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-medium text-blue-400">
-                          {message.user_id === currentUserId ? 'You' : `User ${message.user_id.slice(-4)}`}
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          {new Date(message.created_at).toLocaleTimeString()}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-300">{message.message}</p>
-                    </div>
-                  ))
-                )}
-                <div ref={chatEndRef} />
-              </div>
-              
-              <div className="flex gap-2">
-                <Input
-                  value={chatMessage}
-                  onChange={(e) => setChatMessage(e.target.value)}
-                  placeholder="Type your message..."
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendChat()}
-                  className="flex-1"
-                />
-                <Button onClick={handleSendChat} size="sm">
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Auction Chat - Only for winner and seller */}
+          {auction && currentUserId && (
+            <AuctionChat
+              auctionId={auction.id}
+              experienceId={auction.experience_id}
+              currentUserId={currentUserId}
+              currentUserName={`User ${currentUserId.slice(-4)}`}
+              isWinner={auction.winner_user_id === currentUserId}
+              isSeller={auction.created_by_user_id === currentUserId}
+            />
+          )}
         </div>
       </div>
     </div>
