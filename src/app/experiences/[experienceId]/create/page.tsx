@@ -9,7 +9,15 @@ import { useToast } from "@/hooks/use-toast"
 import { formatCurrency } from "@/lib/payouts"
 import { calculatePayouts } from "@/lib/payouts"
 import { Package, Upload, Calendar, DollarSign, Percent } from "lucide-react"
-import { DigitalProductUpload, DigitalProductData } from "@/components/DigitalProductUpload"
+import { DigitalProductUpload } from "@/components/DigitalProductUpload"
+
+interface DigitalProductData {
+  deliveryType: 'FILE' | 'DISCOUNT_CODE' | 'DOWNLOAD_LINK' | 'INSTRUCTIONS'
+  filePath?: string
+  discountCode?: string
+  downloadLink?: string
+  instructions?: string
+}
 import { ImageUpload } from "@/components/ImageUpload"
 
 interface CreateListingForm {
