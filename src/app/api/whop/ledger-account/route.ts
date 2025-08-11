@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
       console.log('Whop user result:', result)
 
-      if (!result || !result.user) {
+      if (!result) {
         console.log('No user found, returning empty balance')
         return NextResponse.json({
           user: {
@@ -47,14 +47,14 @@ export async function POST(request: NextRequest) {
       }
 
       // Check if user has ledger account info
-      if (result.user.ledgerAccount) {
+      if (result.ledgerAccount) {
         console.log('User has ledger account, returning data')
-        return NextResponse.json(result)
+        return NextResponse.json({ user: result })
       } else {
         console.log('User found but no ledger account, returning empty balance')
         return NextResponse.json({
           user: {
-            ...result.user,
+            ...result,
             ledgerAccount: {
               balanceCaches: {
                 nodes: [
