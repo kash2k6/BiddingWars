@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 
-export type DigitalDeliveryType = 'FILE' | 'DISCOUNT_CODE' | 'DOWNLOAD_LINK'
+export type DigitalDeliveryType = 'FILE' | 'DISCOUNT_CODE' | 'DOWNLOAD_LINK' | 'INSTRUCTIONS'
 
 interface DigitalProductData {
   deliveryType: DigitalDeliveryType
