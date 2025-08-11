@@ -58,7 +58,7 @@ export async function chargeUserForAuction(paymentRequest: PaymentRequest): Prom
 
     const result = await userSdk.payments.chargeUser({
       amount: paymentRequest.amount,
-      currency: paymentRequest.currency,
+      currency: paymentRequest.currency as any,
       userId: paymentRequest.userId,
       description: paymentRequest.description,
       metadata: paymentRequest.metadata,
@@ -66,10 +66,17 @@ export async function chargeUserForAuction(paymentRequest: PaymentRequest): Prom
 
     console.log('Charge user result:', result)
 
+    if (!result) {
+      return {
+        status: 'failed',
+        error: 'No result from payment API'
+      }
+    }
+
     if (result.status === 'success') {
       return {
         status: 'success',
-        inAppPurchase: result.inAppPurchase
+        inAppPurchase: result.inAppPurchase || undefined
       }
     } else if (result.status === 'needs_action' && result.inAppPurchase) {
       return {
@@ -203,22 +210,22 @@ export async function payUser(payoutRequest: PayoutRequest): Promise<void> {
 
     console.log('Ledger account:', ledgerAccount)
 
-    if (!ledgerAccount.company?.ledgerAccount?.id) {
+    if (!ledgerAccount || !ledgerAccount.ledgerAccount?.id) {
       throw new Error('No ledger account found for company')
     }
 
     // Pay the recipient
     await whopSdk.payments.payUser({
       amount: payoutRequest.amount,
-      currency: payoutRequest.currency,
+      currency: payoutRequest.currency as any,
       // Username or ID or ledger account ID of the recipient user
       destinationId: payoutRequest.userId,
       // Your company's ledger account ID
-      ledgerAccountId: ledgerAccount.company.ledgerAccount.id,
+      ledgerAccountId: ledgerAccount.ledgerAccount.id,
       // Optional transfer fee in percentage
-      transferFee: ledgerAccount.company.ledgerAccount.transferFee,
-      description: payoutRequest.description,
-      metadata: payoutRequest.metadata,
+      transferFee: ledgerAccount.ledgerAccount.transferFee,
+      // Required idempotence key to prevent duplicate transfers
+      idempotenceKey: `payout_${payoutRequest.metadata.auctionId}_${payoutRequest.metadata.type}_${Date.now()}`,
     })
 
     console.log('Pay user successful')
@@ -241,6 +248,10 @@ export async function createCheckoutSession(planId: string, metadata?: any): Pro
     })
 
     console.log('Checkout session result:', result)
+
+    if (!result) {
+      throw new Error('No result from checkout session creation')
+    }
 
     return {
       id: result.id,

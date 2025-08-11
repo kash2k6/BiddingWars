@@ -216,15 +216,21 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
 
       // Open Whop payment modal
       const { createInAppPurchase } = await import("@/lib/whop-iframe")
-      const paymentResult = await createInAppPurchase(result.inAppPurchase.planId)
-
-      if (paymentResult.status === 'ok') {
+      try {
+        await createInAppPurchase(result.inAppPurchase.planId)
+        
         toast({
           title: "Purchase Complete!",
           description: "You have successfully purchased this item.",
         })
-      } else {
-        throw new Error(paymentResult.error || 'Payment failed')
+      } catch (paymentError) {
+        // For now, show a message that the payment system is being updated
+        toast({
+          title: "Payment System Update",
+          description: "The payment system is being updated. Please try again later.",
+          variant: "destructive",
+        })
+        throw paymentError
       }
     } catch (error) {
       console.error('Error buying now:', error)

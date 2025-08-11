@@ -68,7 +68,7 @@ export function PaymentHandler({
         const res = await iframeSdk.inAppPurchase(inAppPurchase)
         
         if (res.status === "ok") {
-          setReceiptId(res.data.receipt_id)
+          setReceiptId(res.data.receiptId)
           setPaymentStatus('success')
           setError(undefined)
           

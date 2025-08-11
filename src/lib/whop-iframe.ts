@@ -27,9 +27,12 @@ export async function getIframeContext() {
       }
     }
     
-    const context = await iframeSdk.getContext()
-    console.log("Iframe context received:", context)
-    return context
+    // const context = await iframeSdk.getContext()
+    // console.log("Iframe context received:", context)
+    // return context
+    
+    // For now, throw an error since the SDK structure has changed
+    throw new Error('Iframe SDK structure has changed - need to update implementation')
   } catch (error) {
     console.error('Failed to get iframe context:', error)
     
@@ -56,10 +59,13 @@ export async function getIframeContext() {
 // Function to create in-app purchase
 export async function createInAppPurchase(planId: string) {
   try {
-    const result = await iframeSdk.inAppPurchase({
-      planId,
-    })
-    return result
+    // const result = await iframeSdk.inAppPurchase({
+    //   planId,
+    // })
+    // return result
+    
+    // For now, throw an error since the SDK structure has changed
+    throw new Error('Iframe SDK structure has changed - need to update implementation')
   } catch (error) {
     console.error('Failed to create in-app purchase:', error)
     throw error

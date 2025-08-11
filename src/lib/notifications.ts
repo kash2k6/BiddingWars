@@ -1,4 +1,4 @@
-import { createWhopClient } from '@/lib/whop-client'
+
 
 export interface NotificationData {
   title: string

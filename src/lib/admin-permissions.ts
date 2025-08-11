@@ -29,7 +29,7 @@ export async function checkAdminPermissions(): Promise<AdminUser> {
     let role: 'owner' | 'admin' | 'user' = 'user'
     let companyName: string | undefined = undefined
     
-    console.log('Checking admin permissions for user:', actualUserId, 'experience:', context.experienceId)
+    console.log('Checking admin permissions for user:', actualUserId, 'experience:', experienceId)
     
     try {
       // Always try to get the experience first to get the company ID
@@ -48,7 +48,7 @@ export async function checkAdminPermissions(): Promise<AdminUser> {
       
       console.log('Experience details:', experience)
       companyId = experience.company.id
-      companyName = experience.company.title || experience.company.name
+      companyName = experience.company.title
       
       console.log('Company ID from experience:', companyId)
       console.log('Company name from experience:', companyName)
@@ -99,7 +99,7 @@ export async function getAdminCompanyId(): Promise<string | null> {
       throw new Error('User is not an admin')
     }
     
-    return adminUser.companyId
+    return adminUser.companyId || null
   } catch (error) {
     console.error('Error getting admin company ID:', error)
     return null

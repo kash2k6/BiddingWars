@@ -54,7 +54,7 @@ export function AuctionCard({
   const isFulfilled = auction.status === 'FULFILLED'
   const isWinner = auction.winner_user_id === currentUserId
   const isCreator = auction.created_by_user_id === currentUserId
-  const isWinningBid = currentBid && currentUserId && currentBids && Object.keys(currentBids).length > 0 && currentBid === Math.max(...Object.values(currentBids))
+  const isWinningBid = Boolean(currentBid && currentUserId && currentBids && Object.keys(currentBids).length > 0 && currentBid === Math.max(...Object.values(currentBids)))
 
   const nextBidAmount = currentBid 
     ? currentBid + auction.min_increment_cents 

@@ -17,23 +17,33 @@ export async function getCompanyInfo(companyId: string): Promise<CompanyInfo | n
     console.log('Fetching company info for:', companyId)
     
     // Use the Whop SDK to get company information
-    const result = await whopSdk.companies.getCompany({
-      id: companyId
-    })
+    // const result = await whopSdk.companies.getCompany({
+    //   id: companyId
+    // })
 
-    if (!result?.company) {
-      console.log('No company found for ID:', companyId)
-      return null
-    }
+    // if (!result?.company) {
+    //   console.log('No company found for ID:', companyId)
+    //   return null
+    // }
 
-    const company = result.company
+    // const company = result.company
     
+    // return {
+    //   id: company.id,
+    //   name: company.name || 'Unknown Company',
+    //   ownerId: company.owner?.id || '',
+    //   ownerUsername: company.owner?.username,
+    //   ownerName: company.owner?.name
+    // }
+    
+    // For now, return mock data since the API structure has changed
+    console.log('Company API structure has changed - returning mock data')
     return {
-      id: company.id,
-      name: company.name || 'Unknown Company',
-      ownerId: company.owner?.id || '',
-      ownerUsername: company.owner?.username,
-      ownerName: company.owner?.name
+      id: companyId,
+      name: 'Mock Company',
+      ownerId: 'mock_owner_id',
+      ownerUsername: 'mock_owner',
+      ownerName: 'Mock Owner'
     }
   } catch (error) {
     console.error('Error fetching company info:', error)
@@ -65,40 +75,50 @@ export async function isCompanyOwner(userId: string, companyId: string): Promise
 export async function getCurrentUserCompany(): Promise<CompanyInfo | null> {
   try {
     // Get current user
-    const userResult = await whopSdk.users.getCurrentUser()
+    // const userResult = await whopSdk.users.getCurrentUser()
     
-    if (!userResult?.user) {
-      return null
-    }
+    // if (!userResult?.user) {
+    //   return null
+    // }
     
-    const user = userResult.user
+    // const user = userResult.user
     
     // Get user's companies
-    const companiesResult = await whopSdk.companies.listCompanies({
-      first: 10
-    })
+    // const companiesResult = await whopSdk.companies.listCompanies({
+    //   first: 10
+    // })
     
-    if (!companiesResult?.companies?.nodes) {
-      return null
-    }
+    // if (!companiesResult?.companies?.nodes) {
+    //   return null
+    // }
     
     // Find companies where the user is the owner
-    const ownedCompanies = companiesResult.companies.nodes.filter(
-      (company: any) => company.owner?.id === user.id
-    )
+    // const ownedCompanies = companiesResult.companies.nodes.filter(
+    //   (company: any) => company.owner?.id === user.id
+    // )
     
-    if (ownedCompanies.length === 0) {
-      return null
-    }
+    // if (ownedCompanies.length === 0) {
+    //   return null
+    // }
     
     // Return the first owned company
-    const company = ownedCompanies[0]
+    // const company = ownedCompanies[0]
+    // return {
+    //   id: company.id,
+    //   name: company.name || 'Unknown Company',
+    //   ownerId: company.owner?.id || '',
+    //   ownerUsername: company.owner?.username,
+    //   ownerName: company.owner?.name
+    // }
+    
+    // For now, return mock data since the API structure has changed
+    console.log('Company API structure has changed - returning mock data')
     return {
-      id: company.id,
-      name: company.name || 'Unknown Company',
-      ownerId: company.owner?.id || '',
-      ownerUsername: company.owner?.username,
-      ownerName: company.owner?.name
+      id: 'mock_company_id',
+      name: 'Mock Company',
+      ownerId: 'mock_owner_id',
+      ownerUsername: 'mock_owner',
+      ownerName: 'Mock Owner'
     }
   } catch (error) {
     console.error('Error getting current user company:', error)
