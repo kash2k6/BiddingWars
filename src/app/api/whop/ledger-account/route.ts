@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
     // Try to get the specific user's ledger account
     try {
       const ledgerResult = await userSdk.users.getUserLedgerAccount({
-        userId: actualUserId as string,
-        companyId
+        userId: actualUserId,
+        companyId: companyId as string
       })
       console.log('User ledger account result:', JSON.stringify(ledgerResult, null, 2))
       return NextResponse.json(ledgerResult)
