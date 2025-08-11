@@ -126,11 +126,11 @@ export default function AdminPage({ params }: { params: { experienceId: string }
     const totalRevenue = receipts.reduce((sum, receipt) => sum + receipt.settledUsdAmount, 0)
     const platformFees = receipts.reduce((sum, receipt) => {
       const metadata = receipt.metadata || {}
-      return sum + (metadata.platformFee || 0)
+      return sum + ((metadata as any).platformFee || 0)
     }, 0)
     const communityFees = receipts.reduce((sum, receipt) => {
       const metadata = receipt.metadata || {}
-      return sum + (metadata.communityFee || 0)
+      return sum + ((metadata as any).communityFee || 0)
     }, 0)
 
     setStats({
