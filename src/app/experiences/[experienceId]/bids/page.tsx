@@ -82,7 +82,7 @@ export default function MyBidsPage({ params }: { params: { experienceId: string 
           .order('created_at', { ascending: false })
 
         if (error) throw error
-        setBids(data || [])
+        setBids((data as any) || [])
       } catch (error) {
         console.error('Error fetching bids:', error)
       } finally {
