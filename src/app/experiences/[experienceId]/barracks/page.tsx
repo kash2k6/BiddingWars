@@ -185,19 +185,22 @@ export default function BarracksPage() {
 
   const handleMarkAsReceived = async (itemId: string) => {
     try {
-      // Use the function to mark item as fulfilled
-      const { data, error } = await supabaseClient
-        .rpc('mark_barracks_item_fulfilled', {
-          item_id: itemId,
-          user_id_param: context.userId
+      // Update the barracks item status to DELIVERED
+      const { error } = await supabaseClient
+        .from('barracks_items')
+        .update({
+          status: 'DELIVERED',
+          delivered_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
+        .eq('id', itemId)
 
       if (error) {
         throw error
       }
 
       setPurchasedItems(prev => prev.map(item => 
-        item.id === itemId ? { ...item, status: 'FULFILLED' } : item
+        item.id === itemId ? { ...item, status: 'DELIVERED' } : item
       ))
       
       toast({
@@ -216,25 +219,39 @@ export default function BarracksPage() {
 
   const handleUpdateShippingAddress = async (itemId: string, shippingAddress: any) => {
     try {
+      console.log('Updating shipping address for item:', itemId, shippingAddress)
+      
+      // If shippingAddress is null, we're clearing the address to allow re-entry
+      const updateData = shippingAddress === null 
+        ? { shipping_address: null, updated_at: new Date().toISOString() }
+        : { shipping_address: shippingAddress, updated_at: new Date().toISOString() }
+      
       const { error } = await supabaseClient
-        .from('fulfillments')
-        .upsert({
-          auction_id: itemId,
-          shipping_address: shippingAddress
-        })
+        .from('barracks_items')
+        .update(updateData)
+        .eq('id', itemId)
 
       if (error) {
+        console.error('Supabase error:', error)
         throw error
       }
 
+      // Update local state
       setPurchasedItems(prev => prev.map(item => 
         item.id === itemId ? { ...item, shipping_address: shippingAddress } : item
       ))
       
-      toast({
-        title: "Success!",
-        description: "Shipping address updated",
-      })
+      if (shippingAddress === null) {
+        toast({
+          title: "Address Cleared",
+          description: "You can now enter a new shipping address",
+        })
+      } else {
+        toast({
+          title: "Success!",
+          description: "Shipping address updated",
+        })
+      }
     } catch (error) {
       console.error('Error updating shipping address:', error)
       toast({
@@ -777,29 +794,73 @@ function PurchasedItemCard({
                 />
               ) : (
                 <div className="p-3 bg-gray-100 rounded-md">
-                  <p className="text-sm text-gray-600">Shipping Address:</p>
-                  <p className="text-sm">{JSON.stringify(item.shipping_address)}</p>
+                  <p className="text-sm text-gray-600 font-medium mb-2">Shipping Address:</p>
+                  <div className="text-sm space-y-1">
+                    <p>{item.shipping_address.name}</p>
+                    <p>{item.shipping_address.street}</p>
+                    <p>{item.shipping_address.city}, {item.shipping_address.state} {item.shipping_address.zip}</p>
+                    <p>{item.shipping_address.country}</p>
+                  </div>
+                  <Button 
+                    onClick={() => onUpdateShippingAddress(item.id, null)} 
+                    className="w-full mt-3"
+                    variant="outline"
+                    size="sm"
+                  >
+                    Update Address
+                  </Button>
                 </div>
               )}
               
-              {item.tracking_number && (
-                <a 
-                  href={`https://tracking.example.com/${item.tracking_number}`}
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="block p-3 bg-gray-100 rounded-md text-blue-600 hover:bg-gray-200 transition-colors text-center"
-                >
-                  Track Package ({item.shipping_carrier})
-                </a>
-              )}
+              {/* Shipping Status */}
+              <div className="p-3 bg-gray-100 rounded-md">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-gray-600 font-medium">Shipping Status:</p>
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs ${
+                      item.status === 'PAID' ? 'bg-yellow-100 text-yellow-800' :
+                      item.status === 'SHIPPED' ? 'bg-blue-100 text-blue-800' :
+                      item.status === 'DELIVERED' ? 'bg-green-100 text-green-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    {item.status === 'PAID' ? 'Awaiting Shipment' :
+                     item.status === 'SHIPPED' ? 'Shipped' :
+                     item.status === 'DELIVERED' ? 'Delivered' : item.status}
+                  </Badge>
+                </div>
+                
+                {item.status === 'PAID' && (
+                  <p className="text-xs text-gray-500">Seller will ship once payment is confirmed</p>
+                )}
+                
+                {item.status === 'SHIPPED' && !item.tracking_number && (
+                  <p className="text-xs text-gray-500">Item has been shipped, tracking info coming soon</p>
+                )}
+              </div>
               
-              {item.status === 'PAID' && (
-                <Button 
-                  onClick={() => onMarkReceived(item.id)} 
-                  className="w-full"
-                >
-                  Mark as Received
-                </Button>
+              {/* Tracking Info */}
+              {item.tracking_number && (
+                <div className="space-y-2">
+                  <a 
+                    href={`https://tracking.example.com/${item.tracking_number}`}
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="block p-3 bg-blue-100 rounded-md text-blue-600 hover:bg-blue-200 transition-colors text-center"
+                  >
+                    📦 Track Package ({item.shipping_carrier})
+                  </a>
+                  
+                  {item.status === 'SHIPPED' && (
+                    <Button 
+                      onClick={() => onMarkReceived(item.id)} 
+                      className="w-full"
+                    >
+                      ✅ Mark as Received
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
           )}
