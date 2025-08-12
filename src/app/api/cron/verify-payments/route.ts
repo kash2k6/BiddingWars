@@ -63,16 +63,19 @@ export async function POST(request: NextRequest) {
             const paymentsData = await paymentResponse.json()
             console.log(`Payments for plan ${item.plan_id}:`, JSON.stringify(paymentsData, null, 2))
 
-            // Filter payments to only include payments for THIS specific plan
+            // Filter payments to only include payments for THIS specific plan AND user
             if (paymentsData.data && paymentsData.data.length > 0) {
-              const planPayments = paymentsData.data.filter((payment: any) => payment.plan_id === item.plan_id)
+              const planPayments = paymentsData.data.filter((payment: any) => 
+                payment.plan_id === item.plan_id && 
+                payment.user_id === item.user_id
+              )
               
               if (planPayments.length === 0) {
-                console.log(`No payments found for plan ${item.plan_id} - keeping as pending`)
+                console.log(`No payments found for plan ${item.plan_id} and user ${item.user_id} - keeping as pending`)
                 continue
               }
               
-              const payment = planPayments[0] // Get the first payment for this plan
+              const payment = planPayments[0] // Get the first payment for this plan and user
               console.log(`Payment status for plan ${item.plan_id}: ${payment.status}`)
               
               // Check if payment is successful (API returns "paid" not "succeeded")

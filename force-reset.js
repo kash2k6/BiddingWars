@@ -5,17 +5,17 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-async function manualReset() {
-  console.log('🔄 Manually resetting specific items to PENDING_PAYMENT...\n')
+async function forceReset() {
+  console.log('🔄 Force resetting items to PENDING_PAYMENT...\n')
   
-  // Reset the specific items that were incorrectly marked as paid
+  // Reset specific items by ID
   const itemIds = [
     '875ee1b6-8c67-4109-86c8-8e02fdf520ef',
     'f0bbae05-61c0-4a8f-aebe-85e1faab6438'
   ]
   
   for (const itemId of itemIds) {
-    console.log(`Resetting item: ${itemId}`)
+    console.log(`Force resetting item: ${itemId}`)
     
     const { error } = await supabase
       .from('barracks_items')
@@ -33,7 +33,23 @@ async function manualReset() {
     }
   }
   
-  console.log('\n🔄 Reset complete!')
+  console.log('\n🔄 Force reset complete!')
+  
+  // Verify the reset
+  console.log('\n🔍 Verifying reset...')
+  const { data: items, error } = await supabase
+    .from('barracks_items')
+    .select('*')
+    .in('id', itemIds)
+  
+  if (error) {
+    console.error('Error verifying:', error)
+    return
+  }
+  
+  items.forEach(item => {
+    console.log(`- ID: ${item.id} - Status: ${item.status}`)
+  })
 }
 
-manualReset()
+forceReset()
