@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency } from "@/lib/payouts"
 import { DollarSign, CheckCircle, XCircle, Loader2 } from "lucide-react"
-
+import { getIframeContext, createInAppPurchase } from "@/lib/whop-client"
 
 interface PaymentHandlerProps {
   auctionId: string
@@ -24,6 +24,7 @@ export function PaymentHandler({
 }: PaymentHandlerProps) {
   const [loading, setLoading] = useState(false)
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle')
+  const [receiptId, setReceiptId] = useState<string>()
   const [error, setError] = useState<string>()
   const { toast } = useToast()
   
@@ -38,42 +39,47 @@ export function PaymentHandler({
 
     try {
       // Get the current Whop context
-      const contextResponse = await fetch('/api/whop-context')
-      if (!contextResponse.ok) {
-        throw new Error('Failed to get user context')
-      }
-      const context = await contextResponse.json()
+      const context = await getIframeContext()
 
-      // Create charge and process payment
-      const response = await fetch(`/api/auctions/${auctionId}/finalize`, {
+      // 1. Create charge on server
+      const response = await fetch("/api/charge", {
         method: "POST",
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ 
-          auctionId,
           userId: context.userId, 
           experienceId: context.experienceId,
-          companyId: context.companyId,
-          type: 'buy_now'
+          amount: amount,
+          currency: 'usd',
+          metadata: {
+            auctionId: auctionId,
+            type: 'auction_payment'
+          }
         }),
       })
       
       if (response.ok) {
-        const result = await response.json()
-        setPaymentStatus('success')
-        setError(undefined)
+        const inAppPurchase = await response.json()
         
-        toast({
-          title: "Payment Successful! 🎉",
-          description: `You've won the auction for ${formatCurrency(amount)}!`,
-        })
-        onSuccess?.()
+        // 2. Use the createInAppPurchase function from whop-client
+        const res = await createInAppPurchase(inAppPurchase.id || 'mock-purchase-id')
+        
+        if (res.success) {
+          setReceiptId(res.receiptId)
+          setPaymentStatus('success')
+          setError(undefined)
+          
+          toast({
+            title: "Payment Successful! 🎉",
+            description: `You've won the auction for ${formatCurrency(amount)}!`,
+          })
+          onSuccess?.()
+        } else {
+          setReceiptId(undefined)
+          setPaymentStatus('failed')
+          setError('Payment failed')
+          throw new Error('Payment failed')
+        }
       } else {
-        const errorData = await response.json()
-        setPaymentStatus('failed')
-        setError(errorData.error || 'Payment failed')
-        throw new Error(errorData.error || 'Payment failed')
+        throw new Error("Failed to create charge")
       }
     } catch (error) {
       console.error('Payment error:', error)

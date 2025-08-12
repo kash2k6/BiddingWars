@@ -164,9 +164,8 @@ export function AuctionCard({
           </div>
         )}
         
-        {/* Action buttons - always show uniform layout */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
-          {/* Bid Button - always present */}
+        {/* Bid Button - Always in its own row for clarity */}
+        <div className="w-full">
           {canBid ? (
             <ExcitingBidButton
               amount={nextBidAmount}
@@ -177,29 +176,33 @@ export function AuctionCard({
           ) : (
             <Button 
               disabled
-              className="w-full bg-gray-500 text-white text-sm"
+              className="w-full bg-gray-500 text-white text-sm py-3"
             >
-              Cannot Bid
-            </Button>
-          )}
-          
-          {/* Buy Now Button - always present, but disabled if not available */}
-          {canBuyNow ? (
-            <PaymentHandler
-              auctionId={auction.id}
-              amount={auction.buy_now_price_cents!}
-              onSuccess={() => onBuyNow?.(auction.id)}
-              disabled={false}
-            />
-          ) : (
-            <Button 
-              disabled
-              className="w-full bg-gray-500 text-white text-sm"
-            >
-              {auction.buy_now_price_cents ? 'Cannot Buy Now' : 'No Buy Now'}
+              {isCreator ? 'Cannot Bid on Your Own Auction' : 'Cannot Bid'}
             </Button>
           )}
         </div>
+
+        {/* Buy Now Button - Separate row */}
+        {auction.buy_now_price_cents && (
+          <div className="w-full">
+            {canBuyNow ? (
+              <PaymentHandler
+                auctionId={auction.id}
+                amount={auction.buy_now_price_cents}
+                onSuccess={() => onBuyNow?.(auction.id)}
+                disabled={false}
+              />
+            ) : (
+              <Button 
+                disabled
+                className="w-full bg-gray-500 text-white text-sm py-3"
+              >
+                Cannot Buy Now
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* Secondary actions */}
         <div className="flex flex-col sm:flex-row gap-2 w-full">

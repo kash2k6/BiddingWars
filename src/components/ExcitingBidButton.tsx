@@ -108,22 +108,23 @@ export function ExcitingBidButton({
           ${isAnimating ? 'scale-105 shadow-xl' : 'scale-100'}
           transition-all duration-200 ease-out
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}
+          whitespace-nowrap
         `}
       >
         {/* Animated background */}
         <div className={`absolute inset-0 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 opacity-0 ${isAnimating ? 'animate-pulse opacity-30' : ''}`} />
         
         {/* Content */}
-        <div className="relative flex items-center gap-2">
+        <div className="relative flex items-center justify-center gap-2 min-w-0">
           {loading ? (
             <>
               <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-              <span>DEPLOYING...</span>
+              <span className="truncate">DEPLOYING...</span>
             </>
           ) : (
             <>
               {getButtonIcon()}
-              <span>{getButtonText()}</span>
+              <span className="truncate">{getButtonText()}</span>
             </>
           )}
         </div>

@@ -36,7 +36,8 @@ export async function GET(request: NextRequest) {
       success: true,
       user: {
         id: user.id,
-        username: user.username
+        username: user.username,
+        name: user.name
       }
     })
 

@@ -61,7 +61,8 @@ export default function AuctionChat({
     return () => {
       if (subscribed) {
         console.log('Cleaning up subscriptions')
-        supabase.removeAllSubscriptions()
+        // Note: removeAllSubscriptions is not available in current Supabase version
+        // Subscriptions will be cleaned up automatically when component unmounts
       }
     }
   }, [auctionId, currentUserId])

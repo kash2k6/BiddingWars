@@ -47,9 +47,8 @@ export async function POST(request: NextRequest) {
       console.log('Company ID from experience:', companyId)
       console.log('Company name from experience:', companyName)
 
-      // For now, grant admin access to the experience creator
-      // In a real implementation, you'd check company ownership
       // For development/testing, grant admin access
+      // In production, you would verify the user is the company owner
       isAdmin = true
       role = 'owner'
       console.log('Granting admin access for development/testing')

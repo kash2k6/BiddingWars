@@ -114,6 +114,10 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
 
   // Subscribe to real-time updates
   useEffect(() => {
+    if (auctions.length === 0) return
+
+    console.log('Setting up real-time subscription for auctions:', auctions.map(a => a.id))
+    
     const channel = supabaseClient
       .channel('auction-updates')
       .on('postgres_changes', 
@@ -124,18 +128,27 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
           filter: `auction_id=in.(${auctions.map(a => a.id).join(',')})`
         }, 
         (payload) => {
+          console.log('Real-time bid update received:', payload)
           if (payload.eventType === 'INSERT') {
             const newBid = payload.new as any
-            setCurrentBids(prev => ({
-              ...prev,
-              [newBid.auction_id]: newBid.amount_cents
-            }))
+            console.log('New bid detected:', newBid)
+            setCurrentBids(prev => {
+              const updated = {
+                ...prev,
+                [newBid.auction_id]: newBid.amount_cents
+              }
+              console.log('Updated current bids:', updated)
+              return updated
+            })
           }
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log('Real-time subscription status:', status)
+      })
 
     return () => {
+      console.log('Cleaning up real-time subscription')
       supabaseClient.removeChannel(channel)
     }
   }, [auctions])
@@ -168,16 +181,22 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
         throw new Error(result.error || 'Failed to place bid')
       }
 
-      toast({
-        title: "Bid Placed!",
-        description: `Your bid of ${formatCurrency(amount)} has been placed successfully.`,
+      console.log('Bid successful, updating UI...')
+      
+      // Update local state immediately
+      setCurrentBids(prev => {
+        const updated = {
+          ...prev,
+          [auctionId]: amount
+        }
+        console.log('Updated current bids after successful bid:', updated)
+        return updated
       })
 
-      // Update local state
-      setCurrentBids(prev => ({
-        ...prev,
-        [auctionId]: amount
-      }))
+      toast({
+        title: "Bid Placed! 🎯",
+        description: `Your bid of ${formatCurrency(amount)} has been deployed successfully!`,
+      })
       
       // Refresh auctions data to get updated information
       const { data: updatedAuctions } = await supabaseClient
@@ -285,8 +304,6 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
       })
     }
   }
-
-
 
   if (loading) {
     return (

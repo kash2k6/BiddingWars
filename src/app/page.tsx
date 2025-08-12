@@ -57,10 +57,16 @@ function HomePageContent() {
               Error: {error}
             </p>
           )}
-          <div className="mt-4">
+          <div className="mt-4 space-y-2">
+            <a 
+              href="/dev" 
+              className="block text-blue-600 underline text-sm hover:text-blue-400"
+            >
+              🧪 Development Testing Portal
+            </a>
             <a 
               href="/set-context" 
-              className="text-blue-600 underline text-sm"
+              className="block text-gray-500 underline text-sm hover:text-gray-400"
             >
               Set Context for Development
             </a>

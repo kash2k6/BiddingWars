@@ -219,8 +219,8 @@ export default function AdminPage({ params }: { params: { experienceId: string }
             You need admin permissions to view this page. Only community owners can access the admin dashboard.
           </p>
           <div className="bg-gray-800/50 rounded-lg p-4 text-sm text-gray-300">
-                                    <p><strong>Current User:</strong> {adminUser?.userId || 'Unknown'}</p>
-                        <p><strong>Experience:</strong> {params.experienceId}</p>
+
+          
                         <p><strong>Company ID:</strong> {adminUser?.companyId || 'None (Not a company owner)'}</p>
                         <p><strong>Role:</strong> {adminUser?.role || 'Unknown'}</p>
                         <p><strong>Company Name:</strong> {adminUser?.companyName || 'None'}</p>
@@ -244,7 +244,7 @@ export default function AdminPage({ params }: { params: { experienceId: string }
           {adminUser && (
             <div className="flex items-center gap-2 text-sm text-gray-400">
               <Shield className="h-4 w-4" />
-              <span>User: {adminUser.userId.slice(-8)}</span>
+
               <span>•</span>
               <span>Role: {adminUser.role}</span>
               {adminUser.companyName && (

@@ -446,8 +446,8 @@ export default function CreateListingPage({ params }: { params: { experienceId: 
                     value={form.digitalProduct || { deliveryType: 'FILE' }}
                     onChange={(digitalProduct) => setForm({ ...form, digitalProduct })}
                     disabled={loading}
-                    auctionId={editingAuctionId}
-                    experienceId={params.experienceId}
+                    auctionId={editingAuctionId || undefined}
+                    experienceId={Array.isArray(params.experienceId) ? params.experienceId[0] : params.experienceId}
                   />
                 </CardContent>
               </Card>

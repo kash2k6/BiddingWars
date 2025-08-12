@@ -56,11 +56,7 @@ export function ExcitingLayout({ children, experienceId, userId, companyId }: Ex
                     BIDDING WARS
                   </h1>
                 </div>
-                <div className="hidden md:block">
-                  <span className="text-sm text-gray-300">
-                    Experience: {experienceId}
-                  </span>
-                </div>
+
               </div>
 
               {/* Search and filters */}

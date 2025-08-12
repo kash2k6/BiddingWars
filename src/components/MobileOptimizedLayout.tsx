@@ -82,7 +82,6 @@ export function MobileOptimizedLayout({
             </div>
             <div className="hidden sm:block">
               <h1 className="text-white font-bold text-lg">BiddingWars</h1>
-              <p className="text-gray-400 text-xs">Experience: {experienceId.slice(-8)}</p>
             </div>
           </div>
 
@@ -224,15 +223,13 @@ export function MobileButton({
   variant = 'default',
   className = "",
   ...props 
-}: React.ComponentProps<typeof Button> & { variant?: 'default' | 'primary' | 'secondary' }) {
+}: React.ComponentProps<typeof Button> & { variant?: 'default' | 'secondary' }) {
   const getVariantStyle = () => {
     switch (variant) {
-      case 'primary':
-        return 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white'
       case 'secondary':
         return 'bg-gray-600 hover:bg-gray-700 text-white'
       default:
-        return 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
+        return 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white'
     }
   }
 

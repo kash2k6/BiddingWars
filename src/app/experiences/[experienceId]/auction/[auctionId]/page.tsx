@@ -335,7 +335,7 @@ export default function AuctionDetailPage() {
           <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-500 to-pink-600 bg-clip-text text-transparent">
             {auction.title}
           </h1>
-          <p className="text-sm text-gray-400">Auction ID: {auction.id}</p>
+
         </div>
         <div className="flex items-center gap-2">
           {isLive && (
