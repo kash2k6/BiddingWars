@@ -24,6 +24,7 @@ interface Auction {
   winner_user_id?: string
   current_bid_id?: string
   created_at: string
+  created_by_user_id: string
   bids: {
     amount_cents: number
   }[]
@@ -81,11 +82,12 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
             winner_user_id,
             current_bid_id,
             created_at,
+            created_by_user_id,
             bids(
               amount_cents
             )
           `)
-          .eq('created_by_user_id', currentUserId)
+          .or(`created_by_user_id.eq.${currentUserId},winner_user_id.eq.${currentUserId}`)
           .eq('experience_id', params.experienceId)
           .order('created_at', { ascending: false })
 
@@ -140,6 +142,15 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
   const getCurrentBid = (auction: Auction) => {
     if (auction.bids.length === 0) return auction.start_price_cents
     return Math.max(...auction.bids.map(bid => bid.amount_cents))
+  }
+
+  const getUserRole = (auction: Auction) => {
+    if (auction.created_by_user_id === currentUserId) {
+      return 'CREATOR'
+    } else if (auction.winner_user_id === currentUserId) {
+      return 'WINNER'
+    }
+    return 'UNKNOWN'
   }
 
   const handleEndEarly = async (auctionId: string) => {
@@ -272,14 +283,19 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
                         <Clock className="h-3 w-3 mr-1" />
                         SCHEDULED
                       </Badge>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleEditAuction(auction.id)}
-                        className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold"
-                      >
-                        Edit
-                      </Button>
+                      <Badge variant="outline" className="bg-gradient-to-r from-orange-500 to-yellow-600 text-white font-bold">
+                        {getUserRole(auction)}
+                      </Badge>
+                      {getUserRole(auction) === 'CREATOR' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEditAuction(auction.id)}
+                          className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold"
+                        >
+                          Edit
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -318,7 +334,10 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
                         <Clock className="h-3 w-3 mr-1" />
                         LIVE
                       </Badge>
-                      {auction.bids.length === 0 && (
+                      <Badge variant="outline" className="bg-gradient-to-r from-orange-500 to-yellow-600 text-white font-bold">
+                        {getUserRole(auction)}
+                      </Badge>
+                      {getUserRole(auction) === 'CREATOR' && auction.bids.length === 0 && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -328,14 +347,16 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
                           Edit
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleEndEarly(auction.id)}
-                        className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-bold"
-                      >
-                        End Early
-                      </Button>
+                      {getUserRole(auction) === 'CREATOR' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEndEarly(auction.id)}
+                          className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-bold"
+                        >
+                          End Early
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -371,6 +392,9 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary">Ended</Badge>
+                      <Badge variant="outline" className="bg-gradient-to-r from-orange-500 to-yellow-600 text-white font-bold">
+                        {getUserRole(auction)}
+                      </Badge>
                     </div>
                   </div>
                 </CardContent>
@@ -406,6 +430,9 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline">Pending Payment</Badge>
+                      <Badge variant="outline" className="bg-gradient-to-r from-orange-500 to-yellow-600 text-white font-bold">
+                        {getUserRole(auction)}
+                      </Badge>
                     </div>
                   </div>
                 </CardContent>
@@ -441,7 +468,10 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="default" className="bg-green-600">Paid</Badge>
-                      {auction.type === 'PHYSICAL' && (
+                      <Badge variant="outline" className="bg-gradient-to-r from-orange-500 to-yellow-600 text-white font-bold">
+                        {getUserRole(auction)}
+                      </Badge>
+                      {getUserRole(auction) === 'CREATOR' && auction.type === 'PHYSICAL' && (
                         <Button
                           size="sm"
                           onClick={() => handleMarkShipped(auction.id)}
@@ -484,6 +514,9 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="default" className="bg-blue-600">Fulfilled</Badge>
+                      <Badge variant="outline" className="bg-gradient-to-r from-orange-500 to-yellow-600 text-white font-bold">
+                        {getUserRole(auction)}
+                      </Badge>
                     </div>
                   </div>
                 </CardContent>
