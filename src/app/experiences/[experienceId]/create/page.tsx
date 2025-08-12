@@ -61,6 +61,17 @@ export default function CreateListingPage({ params }: { params: { experienceId: 
 
                 const handleSubmit = async (e: React.FormEvent) => {
                 e.preventDefault()
+                
+                // Client-side validation
+                if (form.buyNowPriceCents && form.buyNowPriceCents <= form.startPriceCents) {
+                  toast({
+                    title: "Invalid Buy Now Price",
+                    description: `Buy now price must be greater than start price ($${(form.startPriceCents / 100).toFixed(2)})`,
+                    variant: "destructive",
+                  })
+                  return
+                }
+                
                 setLoading(true)
 
                 try {
@@ -319,10 +330,15 @@ export default function CreateListingPage({ params }: { params: { experienceId: 
                     value={form.buyNowPriceCents ? form.buyNowPriceCents / 100 : ''}
                     onChange={(e) => handleInputChange('buyNowPriceCents', e.target.value ? Math.round(parseFloat(e.target.value) * 100) : undefined)}
                     className="w-full px-3 py-2 border rounded-md"
-                    min="0.01"
+                    min={(form.startPriceCents / 100 + 0.01).toFixed(2)}
                     step="0.01"
                     placeholder="Leave empty for no buy now option"
                   />
+                  {form.buyNowPriceCents && form.buyNowPriceCents <= form.startPriceCents && (
+                    <p className="text-sm text-red-600 mt-1">
+                      Buy now price must be greater than start price (${(form.startPriceCents / 100).toFixed(2)})
+                    </p>
+                  )}
                 </div>
 
                 {form.type === 'PHYSICAL' && (

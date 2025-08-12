@@ -80,8 +80,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Minimum increment must be greater than 0' }, { status: 400 })
     }
 
-    if (buyNowPriceCents && buyNowPriceCents <= startPriceCents) {
-      return NextResponse.json({ error: 'Buy now price must be greater than start price' }, { status: 400 })
+    if (buyNowPriceCents && buyNowPriceCents > 0 && buyNowPriceCents <= startPriceCents) {
+      return NextResponse.json({ 
+        error: `Buy now price (${(buyNowPriceCents / 100).toFixed(2)}) must be greater than start price (${(startPriceCents / 100).toFixed(2)})` 
+      }, { status: 400 })
     }
 
     // Validate community percentage
