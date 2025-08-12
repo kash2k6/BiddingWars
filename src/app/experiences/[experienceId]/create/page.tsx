@@ -6,8 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { formatCurrency } from "@/lib/payouts"
-import { calculatePayouts } from "@/lib/payouts"
+import { formatCurrency, calculatePayoutDistribution } from "@/lib/payouts"
 import { Package, Upload, Calendar, DollarSign, Percent, AlertTriangle } from "lucide-react"
 import { DigitalProductUpload } from "@/components/DigitalProductUpload"
 
@@ -228,9 +227,9 @@ export default function CreateListingPage({ params }: { params: { experienceId: 
                 }
               }
 
-  // Calculate fee breakdown
-  const totalAmount = form.startPriceCents
-  const payouts = calculatePayouts(totalAmount, 3, form.communityPct)
+  // Calculate fee breakdown (if needed for display)
+  const totalAmount = form.startPriceCents / 100 // Convert cents to dollars
+  const payouts = calculatePayoutDistribution(totalAmount)
 
                 if (loading) {
                 return (
@@ -449,17 +448,17 @@ export default function CreateListingPage({ params }: { params: { experienceId: 
                   <span className="font-medium">{formatCurrency(totalAmount)}</span>
                 </div>
                 <div className="flex justify-between text-red-600">
-                  <span>Platform Fee (3%):</span>
-                  <span>-{formatCurrency(payouts.platformFee)}</span>
+                  <span>Platform Fee:</span>
+                  <span>-{formatCurrency(payouts.platformFee * 100)}</span>
                 </div>
                 <div className="flex justify-between text-orange-600">
-                  <span>Community Fee ({form.communityPct}%):</span>
-                  <span>-{formatCurrency(payouts.communityFee)}</span>
+                  <span>Community Fee (10%):</span>
+                  <span>-{formatCurrency(payouts.communityOwnerAmount * 100)}</span>
                 </div>
                 <div className="border-t pt-2">
                   <div className="flex justify-between font-bold">
                     <span>You Receive:</span>
-                    <span className="text-green-600">{formatCurrency(payouts.sellerAmount)}</span>
+                    <span className="text-green-600">{formatCurrency(payouts.sellerAmount * 100)}</span>
                   </div>
                 </div>
               </CardContent>

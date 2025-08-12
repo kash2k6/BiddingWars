@@ -472,6 +472,7 @@ export default function BarracksPage() {
                 <PurchasedItemCard 
                   key={item.id} 
                   item={item} 
+                  context={context}
                   onDownload={handleDownload}
                   onMarkReceived={handleMarkAsReceived}
                   onUpdateShippingAddress={handleUpdateShippingAddress}
@@ -490,6 +491,7 @@ export default function BarracksPage() {
                   <PurchasedItemCard 
                     key={item.id} 
                     item={item} 
+                    context={context}
                     onDownload={handleDownload}
                     onMarkReceived={handleMarkAsReceived}
                     onUpdateShippingAddress={handleUpdateShippingAddress}
@@ -508,6 +510,7 @@ export default function BarracksPage() {
                   <PurchasedItemCard 
                     key={item.id} 
                     item={item} 
+                    context={context}
                     onDownload={handleDownload}
                     onMarkReceived={handleMarkAsReceived}
                     onUpdateShippingAddress={handleUpdateShippingAddress}
@@ -526,6 +529,7 @@ export default function BarracksPage() {
                   <PurchasedItemCard 
                     key={item.id} 
                     item={item} 
+                    context={context}
                     onDownload={handleDownload}
                     onMarkReceived={handleMarkAsReceived}
                     onUpdateShippingAddress={handleUpdateShippingAddress}
@@ -636,6 +640,7 @@ function ShippingAddressForm({ onSubmit }: { onSubmit: (address: any) => void })
 
 function PurchasedItemCard({ 
   item, 
+  context,
   onDownload, 
   onMarkReceived,
   onUpdateShippingAddress,
@@ -643,6 +648,7 @@ function PurchasedItemCard({
   onVerifyPayment
 }: { 
   item: PurchasedItem
+  context: any
   onDownload: (item: PurchasedItem) => void
   onMarkReceived: (itemId: string) => void
   onUpdateShippingAddress: (itemId: string, shippingAddress: any) => void
