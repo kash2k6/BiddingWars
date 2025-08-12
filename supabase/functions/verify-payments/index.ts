@@ -50,7 +50,7 @@ serve(async (req) => {
 
     console.log(`Found ${allItems.length} barracks items to verify`)
     allItems.forEach(item => {
-      console.log(`  - Item ${item.id}: status=${item.status}, plan_id=${item.plan_id}`)
+      console.log(`  - Item ${item.id}: status=${item.status}, plan_id=${item.plan_id}, payment_id=${item.payment_id || 'none'}`)
     })
 
     let verifiedCount = 0
@@ -61,177 +61,159 @@ serve(async (req) => {
       try {
         console.log(`\n🔍 Processing item ${item.id} (status: ${item.status})`)
         
-        // Use Whop V5 API to check payment status by plan ID
+        // Skip items that don't have a payment_id (these are created by finalize-auctions)
+        if (!item.payment_id) {
+          console.log(`⏭️ Skipping item ${item.id} - no payment_id (created by finalize-auctions)`)
+          continue
+        }
+
+        // Use Whop V5 API to check payment status by specific payment ID
         try {
-          console.log(`🔍 Checking payment status for plan: ${item.plan_id}`)
+          console.log(`🔍 Checking payment status for payment: ${item.payment_id}`)
           
-          // Step 1: List payments for this plan ID
-          const listResponse = await fetch(`https://api.whop.com/v5/app/payments?plan_id=${item.plan_id}&in_app_payments=true`, {
+          // Step 1: Get the specific payment by ID
+          const paymentResponse = await fetch(`https://api.whop.com/v5/app/payments/${item.payment_id}`, {
             headers: {
               'Authorization': `Bearer ${Deno.env.get('WHOP_API_KEY')}`,
               'Content-Type': 'application/json'
             }
           })
 
-          if (!listResponse.ok) {
-            console.error(`Failed to list payments for plan ${item.plan_id}: ${listResponse.status}`)
+          if (!paymentResponse.ok) {
+            console.error(`Failed to get payment ${item.payment_id}: ${paymentResponse.status}`)
             continue
           }
 
-          const listData = await listResponse.json()
-          console.log(`Found ${listData.data?.length || 0} payments for plan ${item.plan_id}`)
-
-          // Step 2: Check payment status - find the specific payment for this item
-          let specificPayment = null
-          let successfulPayment = null
+          const paymentData = await paymentResponse.json()
+          const payment = paymentData.data
           
-          console.log('🔍 Analyzing payments:')
-          for (const payment of listData.data || []) {
-            console.log(`  Payment ${payment.id}: status=${payment.status}, paid_at=${payment.paid_at}, refunded_at=${payment.refunded_at}`)
+          console.log(`Payment ${payment.id}: status=${payment.status}, paid_at=${payment.paid_at}, refunded_at=${payment.refunded_at}`)
+
+          // Check if payment was refunded
+          if (payment.refunded_at) {
+            console.log(`❌ Payment was refunded: ${payment.id}`)
             
-            if (payment.status === 'paid' && payment.paid_at) {
-              // Find the most recent payment for this plan
-              if (!specificPayment || payment.paid_at > specificPayment.paid_at) {
-                specificPayment = payment
-                console.log(`    -> Set as specific payment (most recent)`)
-              }
-              
-              if (!payment.refunded_at) {
-                // This payment is successful and not refunded
-                successfulPayment = payment
-                console.log(`    -> Set as successful payment`)
-              }
-            }
-          }
-          
-          console.log(`Final result: specificPayment=${specificPayment?.id || 'null'}, successfulPayment=${successfulPayment?.id || 'null'}`)
+            // Update barracks item status to REFUNDED
+            console.log(`🔄 Updating barracks item ${item.id} to REFUNDED...`)
+            const { error: updateError } = await supabase
+              .from('barracks_items')
+              .update({
+                status: 'REFUNDED',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', item.id)
 
-          // Handle the specific payment for this barracks item
-          if (specificPayment) {
-            console.log(`Processing specific payment: ${specificPayment.id}, refunded: ${!!specificPayment.refunded_at}`)
-            
-            if (specificPayment.refunded_at) {
-              console.log(`❌ Specific payment was refunded: ${specificPayment.id}`)
-              
-              // Update barracks item status to REFUNDED
-              console.log(`🔄 Updating barracks item ${item.id} to REFUNDED...`)
-              const { error: updateError } = await supabase
-                .from('barracks_items')
-                .update({
-                  status: 'REFUNDED',
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', item.id)
-
-              if (updateError) {
-                console.error(`Error updating barracks item ${item.id} to REFUNDED:`, updateError)
-                errors.push(`Failed to update barracks item ${item.id} to REFUNDED`)
-                continue
-              } else {
-                console.log(`✅ Successfully updated barracks item ${item.id} to REFUNDED`)
-              }
-
-              // Update auction status to REFUNDED
-              console.log(`🔄 Updating auction ${item.auction_id} to REFUNDED...`)
-              const { error: auctionError } = await supabase
-                .from('auctions')
-                .update({
-                  status: 'REFUNDED',
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', item.auction_id)
-
-              if (auctionError) {
-                console.error(`Error updating auction ${item.auction_id} to REFUNDED:`, auctionError)
-                errors.push(`Failed to update auction ${item.auction_id} to REFUNDED`)
-                continue
-              } else {
-                console.log(`✅ Successfully updated auction ${item.auction_id} to REFUNDED`)
-              }
-
-              // Remove winning bid record if it exists
-              console.log(`🔄 Removing winning bid for auction ${item.auction_id}...`)
-              const { error: deleteWinningBidError } = await supabase
-                .from('winning_bids')
-                .delete()
-                .eq('auction_id', item.auction_id)
-
-              if (deleteWinningBidError) {
-                console.error(`Error deleting winning bid for auction ${item.auction_id}:`, deleteWinningBidError)
-                // Don't add to errors as this is not critical
-              } else {
-                console.log(`✅ Successfully removed winning bid for auction ${item.auction_id}`)
-              }
-
-              console.log(`❌ Payment refunded for item ${item.id} - Access removed`)
-              refundedCount++
+            if (updateError) {
+              console.error(`Error updating barracks item ${item.id} to REFUNDED:`, updateError)
+              errors.push(`Failed to update barracks item ${item.id} to REFUNDED`)
               continue
-            } else if (item.status === 'PENDING_PAYMENT') {
-              // Payment is successful and not refunded, and item is pending
-              console.log(`✅ Found successful payment: ${specificPayment.id}`)
-              
-              // Update barracks item status
-              const { error: updateError } = await supabase
-                .from('barracks_items')
-                .update({
-                  status: 'PAID',
-                  paid_at: new Date(specificPayment.paid_at * 1000).toISOString(),
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', item.id)
-
-              if (updateError) {
-                console.error(`Error updating barracks item ${item.id}:`, updateError)
-                errors.push(`Failed to update barracks item ${item.id}`)
-                continue
-              }
-
-              // Update auction status
-              const { error: auctionError } = await supabase
-                .from('auctions')
-                .update({
-                  status: 'PAID',
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', item.auction_id)
-
-              if (auctionError) {
-                console.error(`Error updating auction ${item.auction_id}:`, auctionError)
-                errors.push(`Failed to update auction ${item.auction_id}`)
-                continue
-              }
-
-              // Create winning bid record
-              const { error: winningBidError } = await supabase
-                .from('winning_bids')
-                .insert({
-                  auction_id: item.auction_id,
-                  user_id: item.user_id,
-                  bid_id: item.auction?.current_bid_id,
-                  amount_cents: item.amount_cents,
-                  payment_processed: true,
-                  payment_id: specificPayment.id
-                })
-                .single()
-
-              if (winningBidError) {
-                console.error(`Error creating winning bid for auction ${item.auction_id}:`, winningBidError)
-                errors.push(`Failed to create winning bid for auction ${item.auction_id}`)
-                continue
-              }
-
-              console.log(`✅ Payment verified for item ${item.id} - Item now accessible in barracks`)
-              verifiedCount++
             } else {
-              console.log(`Item ${item.id} is already PAID and payment is not refunded - no action needed`)
+              console.log(`✅ Successfully updated barracks item ${item.id} to REFUNDED`)
             }
-          } else if (item.status === 'PENDING_PAYMENT') {
-            console.log(`⏳ No successful payment found for plan ${item.plan_id}`)
+
+            // Update auction status to REFUNDED
+            console.log(`🔄 Updating auction ${item.auction_id} to REFUNDED...`)
+            const { error: auctionError } = await supabase
+              .from('auctions')
+              .update({
+                status: 'REFUNDED',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', item.auction_id)
+
+            if (auctionError) {
+              console.error(`Error updating auction ${item.auction_id} to REFUNDED:`, auctionError)
+              errors.push(`Failed to update auction ${item.auction_id} to REFUNDED`)
+              continue
+            } else {
+              console.log(`✅ Successfully updated auction ${item.auction_id} to REFUNDED`)
+            }
+
+            // Remove winning bid record if it exists
+            console.log(`🔄 Removing winning bid for auction ${item.auction_id}...`)
+            const { error: deleteWinningBidError } = await supabase
+              .from('winning_bids')
+              .delete()
+              .eq('auction_id', item.auction_id)
+
+            if (deleteWinningBidError) {
+              console.error(`Error deleting winning bid for auction ${item.auction_id}:`, deleteWinningBidError)
+              // Don't add to errors as this is not critical
+            } else {
+              console.log(`✅ Successfully removed winning bid for auction ${item.auction_id}`)
+            }
+
+            console.log(`❌ Payment refunded for item ${item.id} - Access removed`)
+            refundedCount++
+            continue
+          }
+
+          // Check if payment is successful and item is pending
+          if (payment.status === 'paid' && payment.paid_at && item.status === 'PENDING_PAYMENT') {
+            console.log(`✅ Found successful payment: ${payment.id}`)
+            
+            // Update barracks item status
+            const { error: updateError } = await supabase
+              .from('barracks_items')
+              .update({
+                status: 'PAID',
+                paid_at: new Date(payment.paid_at * 1000).toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', item.id)
+
+            if (updateError) {
+              console.error(`Error updating barracks item ${item.id}:`, updateError)
+              errors.push(`Failed to update barracks item ${item.id}`)
+              continue
+            }
+
+            // Update auction status
+            const { error: auctionError } = await supabase
+              .from('auctions')
+              .update({
+                status: 'PAID',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', item.auction_id)
+
+            if (auctionError) {
+              console.error(`Error updating auction ${item.auction_id}:`, auctionError)
+              errors.push(`Failed to update auction ${item.auction_id}`)
+              continue
+            }
+
+            // Create or update winning bid record
+            const { error: winningBidError } = await supabase
+              .from('winning_bids')
+              .upsert({
+                auction_id: item.auction_id,
+                user_id: item.user_id,
+                bid_id: item.auction?.current_bid_id,
+                amount_cents: item.amount_cents,
+                payment_processed: true,
+                payment_id: payment.id
+              }, {
+                onConflict: 'auction_id'
+              })
+
+            if (winningBidError) {
+              console.error(`Error creating/updating winning bid for auction ${item.auction_id}:`, winningBidError)
+              errors.push(`Failed to create/update winning bid for auction ${item.auction_id}`)
+              continue
+            }
+
+            console.log(`✅ Payment verified for item ${item.id} - Item now accessible in barracks`)
+            verifiedCount++
+          } else if (item.status === 'PAID') {
+            console.log(`Item ${item.id} is already PAID and payment is not refunded - no action needed`)
+          } else {
+            console.log(`⏳ Payment ${payment.id} is not yet paid (status: ${payment.status})`)
           }
 
         } catch (paymentError) {
-          console.error(`Error checking payment status for plan ${item.plan_id}:`, paymentError)
-          errors.push(`Failed to check payment status for plan ${item.plan_id}`)
+          console.error(`Error checking payment status for payment ${item.payment_id}:`, paymentError)
+          errors.push(`Failed to check payment status for payment ${item.payment_id}`)
         }
 
       } catch (error) {
