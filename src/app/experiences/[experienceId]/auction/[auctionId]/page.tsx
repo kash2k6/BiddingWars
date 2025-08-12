@@ -303,6 +303,14 @@ export default function AuctionDetailPage() {
         }
         throw new Error('Payment failed')
       }
+      
+      // Show feedback about payment window
+      if (res.paymentUrl) {
+        toast({
+          title: "Payment Required",
+          description: "Please complete your payment in the new window that opened. Close this window after payment.",
+        })
+      }
 
       // Now finalize the auction
       const finalizeResponse = await fetch(`/api/auctions/${auction.id}/finalize`, {
