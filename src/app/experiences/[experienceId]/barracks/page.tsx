@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Download, Package, CheckCircle, AlertCircle, Shield, Medal, Trophy } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { PayoutBreakdown } from '@/components/PayoutBreakdown'
 
 interface PurchasedItem {
   id: string
@@ -42,7 +43,27 @@ export default function BarracksPage() {
   const [purchasedItems, setPurchasedItems] = useState<PurchasedItem[]>([])
   const [loading, setLoading] = useState(true)
   const [context, setContext] = useState<any>(null)
+  const [userNames, setUserNames] = useState<Record<string, string>>({})
   const { toast } = useToast()
+
+  const fetchUserName = async (userId: string): Promise<string> => {
+    try {
+      const response = await fetch(`https://api.whop.com/api/v5/app/users/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_WHOP_API_KEY || 'uywAI0dSirBxNpE0mp46gz-aw03o4e2QaNfODac5hS0'}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (response.ok) {
+        const userData = await response.json()
+        return userData.name || userData.username || userId
+      }
+    } catch (error) {
+      console.error('Error fetching user name:', error)
+    }
+    return userId
+  }
 
   // Check for payment success redirect
   useEffect(() => {
@@ -80,6 +101,17 @@ export default function BarracksPage() {
       }
 
       if (barracksItems) {
+        // Fetch user names for all sellers
+        const uniqueSellerIds = [...new Set(barracksItems.map(item => item.seller_id).filter(Boolean))]
+        const userNamePromises = uniqueSellerIds.map(async (sellerId) => {
+          const userName = await fetchUserName(sellerId)
+          return { [sellerId]: userName }
+        })
+        
+        const userNameResults = await Promise.all(userNamePromises)
+        const newUserNames = userNameResults.reduce((acc, result) => ({ ...acc, ...result }), {})
+        setUserNames(newUserNames)
+
         setPurchasedItems(barracksItems.map(item => ({
           id: item.id || item.auction_id, // Use barracks item ID if available, fallback to auction_id
           auction_id: item.auction_id,
@@ -99,7 +131,7 @@ export default function BarracksPage() {
           shipping_address: item.shipping_address,
           tracking_link: item.tracking_number ? `https://tracking.example.com/${item.tracking_number}` : undefined,
           seller_info: {
-            username: item.seller_id,
+            username: newUserNames[item.seller_id] || item.seller_id,
             email: `${item.seller_id}@example.com`
           }
         })))
@@ -215,8 +247,11 @@ export default function BarracksPage() {
 
   const handleRetryPayment = async (item: PurchasedItem) => {
     try {
-      // If this is a won auction without a plan_id, create a charge first
-      if (!item.plan_id && item.auction_id) {
+      // Check if this is a temporary plan_id (from won auction) or needs a real charge
+      const isTemporaryPlan = item.plan_id && item.plan_id.startsWith('temp_plan_')
+      const needsCharge = !item.plan_id || isTemporaryPlan
+      
+      if (needsCharge && item.auction_id) {
         console.log('Creating charge for won auction:', item.auction_id)
         
         const response = await fetch('/api/charge', {
@@ -291,8 +326,8 @@ export default function BarracksPage() {
             description: "Redirecting to payment page in a new tab.",
           })
         }
-      } else if (item.plan_id) {
-        // Existing plan_id exists, use it directly
+      } else if (item.plan_id && !isTemporaryPlan) {
+        // Real plan_id exists, use it directly
         if (typeof window !== 'undefined' && (window as any).Whop) {
           const whop = (window as any).Whop
           
@@ -615,28 +650,36 @@ function PurchasedItemCard({
   return (
     <Card className="hover:shadow-lg transition-shadow">
       <CardHeader>
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              {item.type === 'DIGITAL' ? <Download className="h-5 w-5" /> : <Package className="h-5 w-5" />}
-              {item.title}
-            </CardTitle>
-            <CardDescription className="mt-2">{item.description}</CardDescription>
+                  <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-sm mb-1 truncate">
+                {item.title}
+              </CardTitle>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                {item.type === 'DIGITAL' ? <Download className="h-4 w-4" /> : <Package className="h-4 w-4" />}
+                {item.type} Product
+              </div>
+            </div>
+            <div className="flex gap-1 flex-shrink-0">
+              <Badge variant={item.type === 'DIGITAL' ? 'default' : 'secondary'} className="text-xs">
+                {item.type}
+              </Badge>
+              <Badge variant="outline" className="text-xs">{item.status}</Badge>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Badge variant={item.type === 'DIGITAL' ? 'default' : 'secondary'}>
-              {item.type}
-            </Badge>
-            <Badge variant="outline">{item.status}</Badge>
-          </div>
-        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           {/* Plan Access Info */}
           <div className="bg-gray-50 p-3 rounded-md">
             <p className="text-sm text-gray-600">Plan ID: <span className="font-mono">{item.plan_id}</span></p>
-            <p className="text-sm text-gray-600">Purchased: {new Date(item.paid_at).toLocaleDateString()}</p>
+            <p className="text-sm text-gray-600">Amount: ${(item.amount_cents / 100).toFixed(2)}</p>
+            <p className="text-sm text-gray-600">
+              {item.paid_at ? 
+                `Purchased: ${new Date(item.paid_at).toLocaleDateString()}` : 
+                `Created: ${item.created_at ? new Date(item.created_at).toLocaleDateString() : 'Unknown'}`
+              }
+            </p>
           </div>
 
           {/* Seller Info */}
@@ -644,6 +687,14 @@ function PurchasedItemCard({
             <div className="bg-blue-50 p-3 rounded-md">
               <p className="text-sm text-blue-600">Seller: {item.seller_info.username}</p>
             </div>
+          )}
+
+          {/* Payout Breakdown for Auction Items */}
+          {item.auction_id && item.status === 'PAID' && (
+            <PayoutBreakdown 
+              totalAmount={item.amount_cents / 100} 
+              showDetails={true}
+            />
           )}
 
           {/* Digital Product */}

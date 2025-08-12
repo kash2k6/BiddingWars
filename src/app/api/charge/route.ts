@@ -53,27 +53,33 @@ export async function POST(request: NextRequest) {
       throw new Error("Failed to create charge")
     }
 
-    // Create barracks item with PENDING_PAYMENT status
-    console.log('Creating barracks item for charge:', result.inAppPurchase.id)
-    
-    const { data: barracksItem, error: barracksError } = await supabaseServer
-      .from('barracks_items')
-      .insert({
-        user_id: actualUserId,
-        auction_id: metadata?.auctionId,
-        plan_id: result.inAppPurchase.planId,
-        amount_cents: amount,
-        payment_id: result.inAppPurchase.id,
-        status: 'PENDING_PAYMENT'
-      })
-      .select()
-      .single()
+    // Only create barracks item if this is NOT an auction win (auction wins already have barracks items)
+    let barracksItem = null
+    if (metadata?.type !== 'auction_win') {
+      console.log('Creating barracks item for charge:', result.inAppPurchase.id)
+      
+      const { data: newBarracksItem, error: barracksError } = await supabaseServer
+        .from('barracks_items')
+        .insert({
+          user_id: actualUserId,
+          auction_id: metadata?.auctionId,
+          plan_id: result.inAppPurchase.planId,
+          amount_cents: amount,
+          payment_id: result.inAppPurchase.id,
+          status: 'PENDING_PAYMENT'
+        })
+        .select()
+        .single()
 
-    if (barracksError) {
-      console.error('Error creating barracks item:', barracksError)
-      // Don't fail the entire request, but log the error
+      if (barracksError) {
+        console.error('Error creating barracks item:', barracksError)
+        // Don't fail the entire request, but log the error
+      } else {
+        console.log('Barracks item created successfully:', newBarracksItem.id)
+        barracksItem = newBarracksItem
+      }
     } else {
-      console.log('Barracks item created successfully:', barracksItem.id)
+      console.log('Skipping barracks item creation for auction win - will be updated by client')
     }
 
     // Return the charge with planId - we'll use the planId directly for checkout

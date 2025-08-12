@@ -115,14 +115,14 @@ serve(async (req) => {
           continue
         }
 
-        // Create barracks item WITHOUT payment_id (will be created when user pays)
+        // Create barracks item with temporary plan_id (will be updated when user creates charge)
         const { error: barracksError } = await supabase
           .from('barracks_items')
           .insert({
             user_id: topBid.bidder_user_id,
             auction_id: auction.id,
             payment_id: null, // Will be set when user creates charge
-            plan_id: null, // Will be set when user creates charge
+            plan_id: `temp_plan_${auction.id}`, // Temporary placeholder, will be updated when user pays
             amount_cents: topBid.amount_cents,
             status: 'PENDING_PAYMENT',
             paid_at: null
@@ -135,18 +135,19 @@ serve(async (req) => {
           console.log(`Created barracks item for auction ${auction.id}`)
         }
 
-        // Create winning_bids entry
+        // Create or update winning_bids entry
         const { error: winningBidError } = await supabase
           .from('winning_bids')
-          .insert({
+          .upsert({
             auction_id: auction.id,
             user_id: topBid.bidder_user_id,
             bid_id: topBid.id,
             amount_cents: topBid.amount_cents,
             payment_processed: false,
             payment_id: null // Will be set when user creates charge
+          }, {
+            onConflict: 'auction_id'
           })
-          .single()
 
         if (winningBidError) {
           console.error(`Error creating winning bid for auction ${auction.id}:`, winningBidError)

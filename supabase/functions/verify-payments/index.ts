@@ -67,25 +67,38 @@ serve(async (req) => {
           continue
         }
 
-        // Use Whop V5 API to check payment status by specific payment ID
+        // Use Whop V5 API to check payment status by plan_id
         try {
-          console.log(`🔍 Checking payment status for payment: ${item.payment_id}`)
+          console.log(`🔍 Checking payment status for plan_id: ${item.plan_id}`)
           
-          // Step 1: Get the specific payment by ID
-          const paymentResponse = await fetch(`https://api.whop.com/v5/app/payments/${item.payment_id}`, {
+          const paymentsResponse = await fetch(`https://api.whop.com/api/v5/app/payments?plan_id=${item.plan_id}&in_app_payments=true`, {
             headers: {
               'Authorization': `Bearer ${Deno.env.get('WHOP_API_KEY')}`,
               'Content-Type': 'application/json'
             }
           })
 
-          if (!paymentResponse.ok) {
-            console.error(`Failed to get payment ${item.payment_id}: ${paymentResponse.status}`)
+          if (!paymentsResponse.ok) {
+            console.error(`Failed to get payments for plan ${item.plan_id}: ${paymentsResponse.status}`)
             continue
           }
 
-          const paymentData = await paymentResponse.json()
-          const payment = paymentData.data
+          const paymentsData = await paymentsResponse.json()
+          
+          if (!paymentsData.data || paymentsData.data.length === 0) {
+            console.log(`❌ No payments found for plan ${item.plan_id}`)
+            continue
+          }
+
+          // Find the most recent paid payment for this plan
+          const paidPayments = paymentsData.data.filter(p => p.status === 'paid' && !p.refunded_at)
+          if (paidPayments.length === 0) {
+            console.log(`❌ No paid payments found for plan ${item.plan_id}`)
+            continue
+          }
+
+          const payment = paidPayments[0] // Use the first paid payment
+          console.log(`✅ Found paid payment for plan ${item.plan_id}: ${payment.id}`)
           
           console.log(`Payment ${payment.id}: status=${payment.status}, paid_at=${payment.paid_at}, refunded_at=${payment.refunded_at}`)
 
@@ -204,6 +217,36 @@ serve(async (req) => {
             }
 
             console.log(`✅ Payment verified for item ${item.id} - Item now accessible in barracks`)
+            
+            // Trigger payout execution for auction wins
+            if (item.auction_id) {
+              try {
+                console.log(`💰 Triggering payout for auction ${item.auction_id}`)
+                
+                // Call the payout API
+                const payoutResponse = await fetch(`${Deno.env.get('APP_URL') || 'http://localhost:3000'}/api/payouts/execute`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${Deno.env.get('WHOP_API_KEY')}`
+                  },
+                  body: JSON.stringify({
+                    auctionId: item.auction_id,
+                    experienceId: item.experience_id
+                  })
+                })
+
+                if (payoutResponse.ok) {
+                  const payoutResult = await payoutResponse.json()
+                  console.log(`✅ Payout executed successfully for auction ${item.auction_id}:`, payoutResult)
+                } else {
+                  console.error(`❌ Payout failed for auction ${item.auction_id}:`, await payoutResponse.text())
+                }
+              } catch (payoutError) {
+                console.error(`❌ Error triggering payout for auction ${item.auction_id}:`, payoutError)
+              }
+            }
+            
             verifiedCount++
           } else if (item.status === 'PAID') {
             console.log(`Item ${item.id} is already PAID and payment is not refunded - no action needed`)
