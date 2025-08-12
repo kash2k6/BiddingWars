@@ -80,7 +80,7 @@ export default function SellerPage({ params }: { params: { experienceId: string 
 
       if (items) {
         // Fetch buyer names for all items
-        const uniqueBuyerIds = [...new Set(items.map(item => item.user_id).filter(Boolean))]
+        const uniqueBuyerIds = Array.from(new Set(items.map(item => item.user_id).filter(Boolean)))
         const buyerNamePromises = uniqueBuyerIds.map(async (buyerId) => {
           const buyerName = await fetchBuyerName(buyerId)
           return { [buyerId]: buyerName }
