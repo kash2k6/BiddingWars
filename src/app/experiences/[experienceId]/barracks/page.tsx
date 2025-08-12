@@ -865,7 +865,6 @@ function PurchasedItemCard({
             <div className="space-y-2">
               <h4 className="font-semibold">Physical Product</h4>
               
-              {console.log('Rendering address section for item:', item.id, 'shipping_address:', item.shipping_address)}
               {!item.shipping_address ? (
                 <ShippingAddressForm 
                   key={`form-${item.id}`}
