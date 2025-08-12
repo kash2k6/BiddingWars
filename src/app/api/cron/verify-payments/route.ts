@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
           console.log(`No payments found for plan ${item.plan_id} - keeping as pending`)
         }
 
-        } catch (paymentError) {
+      } catch (paymentError) {
           console.error(`Error checking payment status for plan ${item.plan_id}:`, paymentError)
           errors.push(`Failed to check payment status for plan ${item.plan_id}`)
         }
