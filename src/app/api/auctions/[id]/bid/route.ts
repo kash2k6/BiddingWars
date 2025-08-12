@@ -73,7 +73,7 @@ export async function POST(
     // Get the previous top bid to check if we need to notify someone they were outbid
     const { data: previousTopBid } = await supabaseServer
       .from('bids')
-      .select('bidder_user_id')
+      .select('bidder_user_id, amount_cents')
       .eq('auction_id', params.id)
       .order('amount_cents', { ascending: false })
       .limit(1)
