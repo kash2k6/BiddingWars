@@ -292,10 +292,10 @@ export default function AuctionDetailPage() {
         throw new Error("Failed to create charge")
       }
       
-      const inAppPurchase = await chargeResponse.json()
+      const chargeResult = await chargeResponse.json()
       
-      // Process the payment
-      const res = await createInAppPurchase(inAppPurchase.id || 'mock-purchase-id')
+      // Process the payment using the charge ID
+      const res = await createInAppPurchase(chargeResult.inAppPurchase.id)
       
       if (!res.success) {
         if (res.error) {
