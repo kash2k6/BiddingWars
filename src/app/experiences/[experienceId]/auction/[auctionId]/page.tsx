@@ -430,7 +430,7 @@ export default function AuctionDetailPage() {
                 <DigitalProductDelivery 
                   auction={auction} 
                   isWinner={isWinner} 
-                  currentUserId={currentUserId}
+                  currentUserId={currentUserId || undefined}
                 />
               </CardContent>
             </Card>
@@ -442,7 +442,7 @@ export default function AuctionDetailPage() {
               <CardContent className="p-0">
                 <PhysicalProductFulfillment 
                   auction={auction} 
-                  currentUserId={currentUserId} 
+                  currentUserId={currentUserId || undefined} 
                   experienceId={experienceId} 
                 />
               </CardContent>
