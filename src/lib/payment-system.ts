@@ -314,31 +314,10 @@ export async function getCompanyReceipts(
   try {
     console.log('Getting company receipts for:', companyId)
 
-    // For now, return mock data since the actual API might not be available
-    // In production, you'd use the actual Whop API
+    // Return empty receipts for now
     const mockReceipts = {
       receipts: {
-        nodes: [
-          {
-            id: 'receipt_1',
-            status: 'succeeded',
-            currency: 'usd',
-            settledUsdAmount: 1000,
-            totalUsdAmount: 1000,
-            amountAfterFees: 970,
-            paidAt: Date.now(),
-            member: {
-              user: {
-                username: 'testuser',
-                name: 'Test User'
-              }
-            },
-            metadata: {
-              auctionId: 'auction_1',
-              type: 'auction_payment'
-            }
-          }
-        ],
+        nodes: [], // Empty array - no receipts to show
         pageInfo: {
           hasNextPage: false,
           endCursor: null
@@ -346,7 +325,7 @@ export async function getCompanyReceipts(
       }
     }
 
-    console.log('Returning mock receipts for development')
+    console.log('Returning empty receipts')
 
     return mockReceipts
   } catch (error) {
