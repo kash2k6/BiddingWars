@@ -663,6 +663,17 @@ function ShippingAddressForm({ onSubmit }: { onSubmit: (address: any) => void })
     console.log('Form submitted, calling onSubmit...')
     onSubmit(address)
     console.log('onSubmit called successfully')
+    
+    // Reset form state after submission
+    setAddress({
+      name: '',
+      street: '',
+      city: '',
+      state: '',
+      zip: '',
+      country: 'US'
+    })
+    console.log('Form state reset successfully')
   }
 
   return (
