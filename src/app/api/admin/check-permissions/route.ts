@@ -47,17 +47,25 @@ export async function POST(request: NextRequest) {
       console.log('Company ID from experience:', companyId)
       console.log('Company name from experience:', companyName)
 
-      // Check if the current user is the company owner
+      // Check if the current user is the company owner using the correct API
       try {
-        const company = await experienceSdk.companies.getCompany({
-          id: companyId
+        const response = await fetch(`https://api.whop.com/api/v5/app/companies/${companyId}`, {
+          headers: {
+            'Authorization': `Bearer ${process.env.WHOP_API_KEY}`,
+            'Content-Type': 'application/json'
+          }
         })
 
+        if (!response.ok) {
+          throw new Error(`Failed to fetch company: ${response.status}`)
+        }
+
+        const company = await response.json()
         console.log('Company details:', company)
-        console.log('Company owner ID:', company?.company?.owner?.id)
+        console.log('Company owner ID:', company?.owner?.id)
         console.log('Current user ID:', actualUserId)
 
-        if (company?.company?.owner?.id === actualUserId) {
+        if (company?.owner?.id === actualUserId) {
           isAdmin = true
           role = 'owner'
           console.log('User is company owner - granting admin access')
