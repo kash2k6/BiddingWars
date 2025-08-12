@@ -29,18 +29,14 @@ export async function GET(request: NextRequest) {
 
     console.log('User info fetched:', {
       id: user.id,
-      username: user.username,
-      email: user.email
+      username: user.username
     })
 
     return NextResponse.json({
       success: true,
       user: {
         id: user.id,
-        username: user.username,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName
+        username: user.username
       }
     })
 
