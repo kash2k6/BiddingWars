@@ -30,6 +30,8 @@ export async function POST(request: NextRequest) {
       // metadata is information that you'd like to receive later about the payment.
       metadata: {
         experienceId: experienceId,
+        auctionId: metadata?.auctionId,
+        type: metadata?.type,
         ...metadata
       },
     })

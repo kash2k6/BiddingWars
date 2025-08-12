@@ -8,7 +8,8 @@ import {
   Package, 
   Wallet, 
   Plus, 
-  Settings 
+  Settings,
+  Shield
 } from "lucide-react"
 
 interface NavTabsProps {
@@ -40,6 +41,12 @@ export function NavTabs({ experienceId, currentTab }: NavTabsProps) {
       href: `/experiences/${experienceId}/auctions`
     },
     {
+      id: "barracks",
+      label: "Barracks",
+      icon: Shield,
+      href: `/experiences/${experienceId}/barracks`
+    },
+    {
       id: "wallet",
       label: "Wallet",
       icon: Wallet,
@@ -64,6 +71,7 @@ export function NavTabs({ experienceId, currentTab }: NavTabsProps) {
     if (pathname === `/experiences/${experienceId}`) return "marketplace"
     if (pathname.includes('/bids')) return "bids"
     if (pathname.includes('/auctions')) return "auctions"
+    if (pathname.includes('/barracks')) return "barracks"
     if (pathname.includes('/wallet')) return "wallet"
     if (pathname.includes('/create')) return "create"
     if (pathname.includes('/admin')) return "admin"
@@ -79,7 +87,7 @@ export function NavTabs({ experienceId, currentTab }: NavTabsProps) {
 
   return (
     <Tabs value={getCurrentTab()} onValueChange={handleTabChange} className="w-full">
-                        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 bg-gradient-to-r from-orange-500 to-red-500">
+                        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-7 bg-gradient-to-r from-orange-500 to-red-500">
                     {tabs.map((tab) => {
                       const Icon = tab.icon
                       return (
