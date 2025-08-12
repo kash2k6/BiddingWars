@@ -65,17 +65,17 @@ export async function createInAppPurchase(paymentData: any) {
     console.log('Processing payment data:', paymentData)
     console.log('Payment data keys:', Object.keys(paymentData))
     
-    // Extract checkout session ID from the payment data
-    const checkoutSessionId = paymentData.checkoutSession?.id || paymentData.id
-    console.log('Using checkout session ID:', checkoutSessionId)
+    // Extract planId from the payment data (from the charge)
+    const planId = paymentData.charge?.planId || paymentData.planId
+    console.log('Using planId:', planId)
     
-    if (!checkoutSessionId) {
-      console.error('No checkout session ID found. Payment data:', paymentData)
-      throw new Error('No checkout session ID found in payment data')
+    if (!planId) {
+      console.error('No planId found. Payment data:', paymentData)
+      throw new Error('No planId found in payment data')
     }
     
-    // Use the checkout session ID for the checkout URL
-    const checkoutUrl = `https://whop.com/checkout/${checkoutSessionId}`
+    // Use the planId directly for the checkout URL (as per Whop documentation)
+    const checkoutUrl = `https://whop.com/checkout/${planId}`
     console.log('Opening checkout URL:', checkoutUrl)
     
     if (typeof window !== 'undefined') {
@@ -96,8 +96,8 @@ export async function createInAppPurchase(paymentData: any) {
       return {
         success: true,
         chargeId: paymentData.charge?.id || paymentData.id,
-        sessionId: checkoutSessionId,
-        receiptId: checkoutSessionId,
+        sessionId: planId,
+        receiptId: planId,
         paymentUrl: checkoutUrl,
         paymentWindow: paymentWindow
       }

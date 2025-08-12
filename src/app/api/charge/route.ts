@@ -36,26 +36,12 @@ export async function POST(request: NextRequest) {
       throw new Error("Failed to create charge")
     }
 
-    // Now create a checkout session using the planId from the charge
-    console.log('Creating checkout session with planId:', result.inAppPurchase.planId)
-    
-    // For now, don't use redirectUrl since localhost is not accepted by Whop
-    // The user will be redirected back to the app after payment completion
-    const checkoutSession = await whopSdk.payments.createCheckoutSession({
-      planId: result.inAppPurchase.planId,
-      metadata: {
-        experienceId: experienceId,
-        chargeId: result.inAppPurchase.id,
-        ...metadata
-      },
-    })
+    // Return the charge with planId - we'll use the planId directly for checkout
+    console.log('Charge created successfully with planId:', result.inAppPurchase.planId)
 
-    console.log('Checkout session result:', checkoutSession)
-
-    // Return both the charge and checkout session
+    // Return the charge object which contains the planId
     return NextResponse.json({
-      charge: result.inAppPurchase,
-      checkoutSession: checkoutSession
+      charge: result.inAppPurchase
     })
   } catch (error) {
     console.error("Error creating charge or checkout session:", error)
