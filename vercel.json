@@ -6,15 +6,5 @@
     "src/app/api/cron/verify-payments/route.ts": {
       "maxDuration": 30
     }
-  },
-  "crons": [
-    {
-      "path": "/api/cron/finalize-auctions",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/verify-payments", 
-      "schedule": "*/2 * * * *"
-    }
-  ]
+  }
 }
