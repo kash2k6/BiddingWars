@@ -702,7 +702,7 @@ function PurchasedItemCard({
             <p className="text-sm text-gray-600">
               {item.paid_at ? 
                 `Purchased: ${new Date(item.paid_at).toLocaleDateString()}` : 
-                `Created: ${item.created_at ? new Date(item.created_at).toLocaleDateString() : 'Unknown'}`
+                `Status: ${item.status}`
               }
             </p>
           </div>
