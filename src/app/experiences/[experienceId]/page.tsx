@@ -252,27 +252,14 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
       
       const chargeResult = await chargeResponse.json()
       
-      // Process the payment using the charge ID
-      const res = await createInAppPurchase(chargeResult.inAppPurchase.id)
+      // Open payment modal using the inAppPurchase object
+      const res = await createInAppPurchase(chargeResult.inAppPurchase)
       
       if (!res.success) {
         if (res.error) {
           throw new Error(res.error)
         }
         throw new Error('Payment failed')
-      }
-      
-      // Show feedback based on the result
-      if (res.isDevelopment) {
-        toast({
-          title: "Development Mode",
-          description: "Payment simulated successfully for testing.",
-        })
-      } else if (res.redirectUrl) {
-        toast({
-          title: "Payment Required",
-          description: "Please complete your payment in the new window that opened.",
-        })
       }
 
       // Now finalize the auction

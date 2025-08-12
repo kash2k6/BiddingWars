@@ -60,68 +60,38 @@ export async function getIframeContext() {
 }
 
 // Function to create in-app purchase
-export async function createInAppPurchase(chargeId: string) {
+export async function createInAppPurchase(inAppPurchase: any) {
   try {
-    console.log('Processing payment for charge:', chargeId)
+    console.log('Opening payment modal for:', inAppPurchase)
     
-    // For development, simulate the payment flow
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Development mode: Simulating payment completion')
-      
-      // In development, we'll simulate a successful payment after a delay
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      return {
-        success: true,
-        chargeId,
-        sessionId: chargeId,
-        receiptId: chargeId,
-        isDevelopment: true
-      }
-    }
+    // Use the iframe SDK to open the payment modal
+    const result = await iframeSdk.inAppPurchase(inAppPurchase)
     
-    // In production, use the iframe SDK to open the payment modal
-    try {
-      // Try to use the iframe SDK to process the charge
-      const result = await iframeSdk.inAppPurchase.process({
-        chargeId: chargeId
-      })
-      
-      console.log('Payment processing result:', result)
-      
+    console.log('Payment modal result:', result)
+    
+    if (result.status === "ok") {
       return {
         success: true,
-        chargeId,
-        sessionId: result.id || chargeId,
-        receiptId: result.id || chargeId
+        receiptId: result.data.receipt_id,
+        sessionId: result.data.session_id || inAppPurchase.id,
+        chargeId: inAppPurchase.id
       }
-    } catch (sdkError) {
-      console.error('Iframe SDK failed, trying alternative approach:', sdkError)
-      
-      // Alternative: redirect to the charge URL or show payment instructions
-      const chargeUrl = `https://whop.com/checkout/${chargeId}`
-      console.log('Redirecting to charge URL:', chargeUrl)
-      
-      // Open the payment URL in a new window/tab
-      if (typeof window !== 'undefined') {
-        window.open(chargeUrl, '_blank')
-      }
-      
+    } else {
       return {
-        success: true,
-        chargeId,
-        sessionId: chargeId,
-        receiptId: chargeId,
-        redirectUrl: chargeUrl
+        success: false,
+        error: result.error || 'Payment failed',
+        chargeId: inAppPurchase.id,
+        sessionId: null,
+        receiptId: null
       }
     }
   } catch (error) {
-    console.error('Failed to process payment:', error)
+    console.error('Failed to open payment modal:', error)
     
     return {
       success: false,
-      error: 'Payment processing failed. Please try again or contact support.',
-      chargeId,
+      error: 'Failed to open payment modal. Please try again.',
+      chargeId: inAppPurchase?.id,
       sessionId: null,
       receiptId: null
     }
