@@ -146,14 +146,21 @@ export default function BarracksPage() {
           }
         }))
 
-        // Fetch shipping costs for physical items
+        // Fetch shipping costs for physical items directly from database
         const itemsWithShippingCosts = await Promise.all(
           mappedItems.map(async (item) => {
             if (item.type === 'PHYSICAL' && item.auction_id) {
               try {
-                const auctionResponse = await fetch(`/api/auctions/${item.auction_id}`)
-                if (auctionResponse.ok) {
-                  const auctionData = await auctionResponse.json()
+                const { data: auctionData, error: auctionError } = await supabaseClient
+                  .from('auctions')
+                  .select('shipping_cost_cents')
+                  .eq('id', item.auction_id)
+                  .single()
+                
+                if (auctionError) {
+                  console.error('Error fetching auction shipping cost:', auctionError)
+                } else {
+                  console.log('Fetched auction data for shipping cost:', { auctionId: item.auction_id, shippingCost: auctionData.shipping_cost_cents })
                   return { ...item, shipping_cost_cents: auctionData.shipping_cost_cents || 0 }
                 }
               } catch (error) {
@@ -274,6 +281,9 @@ export default function BarracksPage() {
       setPurchasedItems(prev => prev.map(item => 
         item.id === itemId ? { ...item, shipping_address: shippingAddress } : item
       ))
+      
+      // Reload the data to ensure it's fresh
+      await loadPurchasedItems()
       
       if (shippingAddress === null) {
         toast({
