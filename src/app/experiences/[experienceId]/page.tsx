@@ -261,6 +261,19 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
         }
         throw new Error('Payment failed')
       }
+      
+      // Show feedback based on the result
+      if (res.isDevelopment) {
+        toast({
+          title: "Development Mode",
+          description: "Payment simulated successfully for testing.",
+        })
+      } else if (res.redirectUrl) {
+        toast({
+          title: "Payment Required",
+          description: "Please complete your payment in the new window that opened.",
+        })
+      }
 
       // Now finalize the auction
       const finalizeResponse = await fetch(`/api/auctions/${auctionId}/finalize`, {
