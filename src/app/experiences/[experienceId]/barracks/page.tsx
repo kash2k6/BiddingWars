@@ -277,13 +277,21 @@ export default function BarracksPage() {
         throw error
       }
 
-      // Update local state
-      setPurchasedItems(prev => prev.map(item => 
-        item.id === itemId ? { ...item, shipping_address: shippingAddress } : item
-      ))
+      // Update local state immediately for better UX
+      setPurchasedItems(prev => {
+        const updated = prev.map(item => 
+          item.id === itemId ? { ...item, shipping_address: shippingAddress } : item
+        )
+        console.log('Updated local state:', updated.find(item => item.id === itemId))
+        return updated
+      })
       
-      // Reload the data to ensure it's fresh
-      await loadPurchasedItems()
+      // Force a re-render by updating the state again
+      setTimeout(() => {
+        setPurchasedItems(prev => prev.map(item => 
+          item.id === itemId ? { ...item, shipping_address: shippingAddress } : item
+        ))
+      }, 100)
       
       if (shippingAddress === null) {
         toast({
@@ -857,8 +865,10 @@ function PurchasedItemCard({
             <div className="space-y-2">
               <h4 className="font-semibold">Physical Product</h4>
               
+              {console.log('Rendering address section for item:', item.id, 'shipping_address:', item.shipping_address)}
               {!item.shipping_address ? (
                 <ShippingAddressForm 
+                  key={`form-${item.id}`}
                   onSubmit={(address) => onUpdateShippingAddress(item.id, address)}
                 />
               ) : (
