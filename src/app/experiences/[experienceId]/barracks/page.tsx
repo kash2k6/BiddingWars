@@ -23,6 +23,7 @@ interface PurchasedItem {
   paid_at: string
   amount_cents: number
   seller_id?: string
+  shipping_cost_cents?: number
   digital_product?: {
     delivery_type: 'FILE' | 'DOWNLOAD_LINK' | 'DISCOUNT_CODE'
     file_url?: string
@@ -120,8 +121,8 @@ export default function BarracksPage() {
           type: item.auction_type
         })))
         
-        setPurchasedItems(barracksItems.map(item => ({
-          id: item.id || item.auction_id, // Use barracks item ID if available, fallback to auction_id
+        const mappedItems = barracksItems.map(item => ({
+          id: item.id, // Always use the actual barracks_items.id
           auction_id: item.auction_id,
           title: item.title,
           description: item.description,
@@ -143,7 +144,27 @@ export default function BarracksPage() {
             username: newUserNames[item.seller_id] || item.seller_id,
             email: `${item.seller_id}@example.com`
           }
-        })))
+        }))
+
+        // Fetch shipping costs for physical items
+        const itemsWithShippingCosts = await Promise.all(
+          mappedItems.map(async (item) => {
+            if (item.type === 'PHYSICAL' && item.auction_id) {
+              try {
+                const auctionResponse = await fetch(`/api/auctions/${item.auction_id}`)
+                if (auctionResponse.ok) {
+                  const auctionData = await auctionResponse.json()
+                  return { ...item, shipping_cost_cents: auctionData.shipping_cost_cents || 0 }
+                }
+              } catch (error) {
+                console.error('Error fetching auction shipping cost:', error)
+              }
+            }
+            return item
+          })
+        )
+
+        setPurchasedItems(itemsWithShippingCosts)
       }
     } catch (error) {
       console.error('Error loading purchased items:', error)
@@ -288,11 +309,9 @@ export default function BarracksPage() {
         
         // Calculate total amount including shipping for physical items
         let totalAmount = item.amount_cents
-        let shippingCost = 0
+        let shippingCost = item.shipping_cost_cents || 0
         
         if (item.type === 'PHYSICAL') {
-          // Add shipping cost for physical items (e.g., $5.00 shipping)
-          shippingCost = 500 // $5.00 in cents
           totalAmount += shippingCost
           console.log('Adding shipping cost for physical item:', { original: item.amount_cents, shipping: shippingCost, total: totalAmount })
         }
@@ -798,7 +817,7 @@ function PurchasedItemCard({
                 {item.type === 'PHYSICAL' && (
                   <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
                     <p className="text-xs text-blue-800">
-                      <strong>Shipping Cost:</strong> $5.00 will be added to your payment
+                      <strong>Shipping Cost:</strong> ${((item.shipping_cost_cents || 0) / 100).toFixed(2)} will be added to your payment
                     </p>
                   </div>
                 )}
