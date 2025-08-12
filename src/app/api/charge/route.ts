@@ -39,15 +39,10 @@ export async function POST(request: NextRequest) {
     // Now create a checkout session using the planId from the charge
     console.log('Creating checkout session with planId:', result.inAppPurchase.planId)
     
-    // Use HTTPS URL for redirect - this should go to a claim/fulfillment page
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://localhost:3000'
-    const redirectUrl = `${baseUrl}/experiences/${experienceId}/claim/${result.inAppPurchase.id}`
-    
-    console.log('Using redirect URL:', redirectUrl)
-    
+    // For now, don't use redirectUrl since localhost is not accepted by Whop
+    // The user will be redirected back to the app after payment completion
     const checkoutSession = await whopSdk.payments.createCheckoutSession({
       planId: result.inAppPurchase.planId,
-      redirectUrl: redirectUrl,
       metadata: {
         experienceId: experienceId,
         chargeId: result.inAppPurchase.id,
