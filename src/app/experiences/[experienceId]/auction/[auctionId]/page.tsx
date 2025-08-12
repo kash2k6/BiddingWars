@@ -154,8 +154,8 @@ export default function AuctionDetailPage() {
       }
     }
 
-    fetchAuctionData()
-  }, [params.auctionId, toast, audio])
+      fetchAuctionData()
+}, [params.auctionId, toast])
 
   // Real-time subscriptions
   useEffect(() => {
