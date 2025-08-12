@@ -298,6 +298,9 @@ export default function AuctionDetailPage() {
       const res = await createInAppPurchase(inAppPurchase.id || 'mock-purchase-id')
       
       if (!res.success) {
+        if (res.error) {
+          throw new Error(res.error)
+        }
         throw new Error('Payment failed')
       }
 

@@ -256,6 +256,9 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
       const res = await createInAppPurchase(inAppPurchase.id || 'mock-purchase-id')
       
       if (!res.success) {
+        if (res.error) {
+          throw new Error(res.error)
+        }
         throw new Error('Payment failed')
       }
 

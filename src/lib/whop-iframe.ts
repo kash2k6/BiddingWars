@@ -64,16 +64,35 @@ export async function createInAppPurchase(planId: string) {
   try {
     console.log('Creating in-app purchase for plan:', planId)
     
-    // For now, use a mock implementation since the iframe SDK structure has changed
-    console.log('Mock in-app purchase created for plan:', planId)
+    // Use the actual iframe SDK to create the payment
+    const result = await iframeSdk.inAppPurchase.create({
+      planId: planId
+    })
+    
+    console.log('In-app purchase result:', result)
+    
     return {
       success: true,
       planId,
-      sessionId: 'mock-session-id',
-      receiptId: 'mock-receipt-id'
+      sessionId: result.id,
+      receiptId: result.id
     }
   } catch (error) {
     console.error('Failed to create in-app purchase:', error)
+    
+    // For development, if the SDK fails, we might want to show a more helpful error
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Development mode: Payment would be processed in production')
+      // In development, we could show a modal or redirect to test the flow
+      return {
+        success: false,
+        error: 'Payment processing not available in development mode. In production, this would open the Whop payment modal.',
+        planId,
+        sessionId: null,
+        receiptId: null
+      }
+    }
+    
     throw error
   }
 }
