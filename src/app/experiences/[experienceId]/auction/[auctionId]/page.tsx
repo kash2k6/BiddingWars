@@ -443,7 +443,7 @@ export default function AuctionDetailPage() {
                 <PhysicalProductFulfillment 
                   auction={auction} 
                   currentUserId={currentUserId} 
-                  experienceId={params.experienceId} 
+                  experienceId={Array.isArray(params.experienceId) ? params.experienceId[0] : params.experienceId} 
                 />
               </CardContent>
             </Card>
@@ -534,8 +534,8 @@ export default function AuctionDetailPage() {
         <div className="space-y-6">
           {/* Live Feed */}
           <LiveFeed 
-            experienceId={params.experienceId}
-            currentUserId={currentUserId}
+            experienceId={Array.isArray(params.experienceId) ? params.experienceId[0] : params.experienceId}
+            currentUserId={currentUserId || undefined}
             maxItems={15}
           />
 
