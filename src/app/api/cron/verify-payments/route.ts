@@ -140,10 +140,6 @@ export async function POST(request: NextRequest) {
 
           console.log(`Payment failed for item ${item.id} - Item removed from barracks, auction reset`)
           verifiedCount++
-
-        } else {
-          // Payment still pending - leave as is
-          console.log(`Payment still pending for item ${item.id}: ${charge.status}`)
         }
 
       } catch (error) {
