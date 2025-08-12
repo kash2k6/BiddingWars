@@ -75,7 +75,7 @@ export async function executePayouts(payoutRequest: PayoutRequest): Promise<{
     
     // Get the company's ledger account
     const ledgerAccount = await whopSdk.companies.getCompanyLedgerAccount({ companyId });
-    const ledgerAccountId = ledgerAccount.company?.ledgerAccount.id;
+    const ledgerAccountId = ledgerAccount?.company?.ledgerAccount?.id;
 
     if (!ledgerAccountId) {
       throw new Error('Could not find ledger account for company');
@@ -94,7 +94,7 @@ export async function executePayouts(payoutRequest: PayoutRequest): Promise<{
           idempotenceKey: `seller_payout_${auctionId}_${Date.now()}`,
           reason: 'creator_to_creator' as any,
           notes: `Auction payout for ${auctionId}`,
-          transferFee: ledgerAccount.company?.ledgerAccount.transferFee || 0
+          transferFee: ledgerAccount?.company?.ledgerAccount?.transferFee || 0
         });
         
         payouts.sellerPayout = sellerPayout;
@@ -117,7 +117,7 @@ export async function executePayouts(payoutRequest: PayoutRequest): Promise<{
           idempotenceKey: `community_payout_${auctionId}_${Date.now()}`,
           reason: 'creator_to_creator' as any,
           notes: `Community owner payout for auction ${auctionId}`,
-          transferFee: ledgerAccount.company?.ledgerAccount.transferFee || 0
+          transferFee: ledgerAccount?.company?.ledgerAccount?.transferFee || 0
         });
         
         payouts.communityOwnerPayout = communityOwnerPayout;
