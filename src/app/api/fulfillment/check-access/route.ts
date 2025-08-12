@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { whopSdk } from '@/lib/whop'
-import { createClient } from '@/lib/supabase-server'
+import { supabaseServer } from '@/lib/supabase-server'
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Get auction details from database
-    const supabase = createClient()
+    const supabase = supabaseServer
     const { data: auction, error: auctionError } = await supabase
       .from('auctions')
       .select('*')
