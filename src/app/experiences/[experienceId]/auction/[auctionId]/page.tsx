@@ -443,7 +443,7 @@ export default function AuctionDetailPage() {
                 <PhysicalProductFulfillment 
                   auction={auction} 
                   currentUserId={currentUserId} 
-                  experienceId={experienceId} 
+                  experienceId={params.experienceId} 
                 />
               </CardContent>
             </Card>
