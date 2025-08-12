@@ -19,8 +19,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Convert amount from cents to dollars for Whop API
+    const amountInDollars = amount / 100
+    console.log('Converting amount from cents to dollars:', { cents: amount, dollars: amountInDollars })
+
     const result = await whopSdk.payments.chargeUser({
-      amount: amount,
+      amount: amountInDollars,
       currency: currency,
       userId: actualUserId,
       // metadata is information that you'd like to receive later about the payment.

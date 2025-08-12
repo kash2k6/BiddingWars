@@ -63,15 +63,18 @@ export function PaymentHandler({
         const res = await createInAppPurchase(chargeResult)
         
         if (res.success) {
+          // Payment window opened successfully, but payment not completed yet
           setReceiptId(res.receiptId)
-          setPaymentStatus('success')
+          setPaymentStatus('processing')
           setError(undefined)
           
           toast({
-            title: "Payment Successful! 🎉",
-            description: `You've won the auction for ${formatCurrency(amount)}!`,
+            title: "Payment Window Opened",
+            description: "Please complete your payment in the new window. The auction will be finalized once payment is confirmed.",
           })
-          onSuccess?.()
+          
+          // Don't call onSuccess yet - wait for actual payment completion
+          // The auction will be finalized through webhooks or manual verification
         } else {
           setReceiptId(undefined)
           setPaymentStatus('failed')
@@ -117,6 +120,13 @@ export function PaymentHandler({
             Payment Successful!
           </>
         )
+      case 'processing':
+        return (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Payment Window Opened
+          </>
+        )
       case 'failed':
         return (
           <>
@@ -138,6 +148,8 @@ export function PaymentHandler({
     switch (paymentStatus) {
       case 'success':
         return 'default' as const
+      case 'processing':
+        return 'default' as const
       case 'failed':
         return 'destructive' as const
       default:
@@ -151,6 +163,8 @@ export function PaymentHandler({
     switch (paymentStatus) {
       case 'success':
         return `${baseClass} bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white`
+      case 'processing':
+        return `${baseClass} bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white`
       case 'failed':
         return `${baseClass} bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white`
       default:
