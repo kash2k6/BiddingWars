@@ -63,12 +63,14 @@ export async function getIframeContext() {
 export async function createInAppPurchase(paymentData: any) {
   try {
     console.log('Processing payment data:', paymentData)
+    console.log('Payment data keys:', Object.keys(paymentData))
     
     // Extract checkout session ID from the payment data
     const checkoutSessionId = paymentData.checkoutSession?.id || paymentData.id
     console.log('Using checkout session ID:', checkoutSessionId)
     
     if (!checkoutSessionId) {
+      console.error('No checkout session ID found. Payment data:', paymentData)
       throw new Error('No checkout session ID found in payment data')
     }
     
@@ -77,10 +79,15 @@ export async function createInAppPurchase(paymentData: any) {
     console.log('Opening checkout URL:', checkoutUrl)
     
     if (typeof window !== 'undefined') {
+      console.log('Attempting to open payment window...')
+      
       // Open checkout URL in a new window/tab
       const paymentWindow = window.open(checkoutUrl, '_blank', 'width=500,height=600,scrollbars=yes,resizable=yes')
       
+      console.log('Payment window result:', paymentWindow)
+      
       if (!paymentWindow) {
+        console.error('Failed to open payment window - popup blocked?')
         throw new Error('Failed to open payment window. Please allow popups and try again.')
       }
       
