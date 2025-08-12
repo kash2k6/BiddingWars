@@ -164,8 +164,9 @@ export function AuctionCard({
           </div>
         )}
         
-        {/* Action buttons - responsive grid */}
+        {/* Action buttons - always show uniform layout */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
+          {/* Bid Button - always present */}
           {canBid ? (
             <ExcitingBidButton
               amount={nextBidAmount}
@@ -182,6 +183,7 @@ export function AuctionCard({
             </Button>
           )}
           
+          {/* Buy Now Button - always present, but disabled if not available */}
           {canBuyNow ? (
             <PaymentHandler
               auctionId={auction.id}
@@ -189,14 +191,14 @@ export function AuctionCard({
               onSuccess={() => onBuyNow?.(auction.id)}
               disabled={false}
             />
-          ) : auction.buy_now_price_cents ? (
+          ) : (
             <Button 
               disabled
               className="w-full bg-gray-500 text-white text-sm"
             >
-              Cannot Buy Now
+              {auction.buy_now_price_cents ? 'Cannot Buy Now' : 'No Buy Now'}
             </Button>
-          ) : null}
+          )}
         </div>
 
         {/* Secondary actions */}

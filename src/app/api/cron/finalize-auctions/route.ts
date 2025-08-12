@@ -69,7 +69,8 @@ export async function POST(request: NextRequest) {
                 await sendAuctionEndedNoBidsNotification(
                   auction.created_by_user_id,
                   auction.id,
-                  auction.title
+                  auction.title,
+                  auction.experience_id
                 )
                 console.log('No bids notification sent for auction:', auction.id)
               } catch (notificationError) {
@@ -154,7 +155,8 @@ export async function POST(request: NextRequest) {
             topBid.bidder_user_id,
             auction.id,
             auction.title,
-            totalAmount
+            totalAmount,
+            auction.experience_id
           )
           
           // Notify seller
@@ -162,7 +164,8 @@ export async function POST(request: NextRequest) {
             auction.created_by_user_id,
             auction.id,
             auction.title,
-            totalAmount
+            totalAmount,
+            auction.experience_id
           )
           
           // Get all bidders to notify losers
@@ -177,7 +180,8 @@ export async function POST(request: NextRequest) {
               auction.id,
               auction.title,
               topBid.bidder_user_id,
-              allBidderIds
+              allBidderIds,
+              auction.experience_id
             )
           }
           

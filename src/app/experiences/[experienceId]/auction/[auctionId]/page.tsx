@@ -16,7 +16,9 @@ import { Countdown } from "@/components/Countdown"
 import { ExcitingBidButton } from "@/components/ExcitingBidButton"
 import { PaymentHandler } from "@/components/PaymentHandler"
 import { DigitalProductDelivery } from "@/components/DigitalProductDelivery"
+import { PhysicalProductFulfillment } from "@/components/PhysicalProductFulfillment"
 import AuctionChat from "@/components/AuctionChat"
+import { LiveFeed } from "@/components/LiveFeed"
 import { 
   Clock, 
   DollarSign, 
@@ -422,10 +424,27 @@ export default function AuctionDetailPage() {
           </Card>
 
           {/* Digital Product Delivery for Winners */}
-          {auction.status === 'PAID' && isWinner && (
+          {auction.status === 'PAID' && auction.type === 'DIGITAL' && (
             <Card>
               <CardContent className="p-0">
-                <DigitalProductDelivery auction={auction} isWinner={isWinner} />
+                <DigitalProductDelivery 
+                  auction={auction} 
+                  isWinner={isWinner} 
+                  currentUserId={currentUserId}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Physical Product Fulfillment */}
+          {auction.status === 'PAID' && auction.type === 'PHYSICAL' && (
+            <Card>
+              <CardContent className="p-0">
+                <PhysicalProductFulfillment 
+                  auction={auction} 
+                  currentUserId={currentUserId} 
+                  experienceId={experienceId} 
+                />
               </CardContent>
             </Card>
           )}
@@ -438,15 +457,20 @@ export default function AuctionDetailPage() {
                 Live Bidding
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-400">Time Remaining</p>
-                  <Countdown endTime={auction.ends_at} />
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-400">Total Bids</p>
-                  <p className="text-xl font-bold text-white">{bids.length}</p>
+            <CardContent className="space-y-6">
+              {/* Prominent Countdown Section */}
+              <div className="bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-lg p-4">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-center sm:text-left">
+                    <p className="text-sm text-gray-400 mb-2">⏰ Time Remaining</p>
+                    <div className="flex justify-center sm:justify-start">
+                      <Countdown endTime={auction.ends_at} className="text-lg" />
+                    </div>
+                  </div>
+                  <div className="text-center sm:text-right">
+                    <p className="text-sm text-gray-400 mb-2">🏆 Total Bids</p>
+                    <p className="text-2xl font-bold text-white">{bids.length}</p>
+                  </div>
                 </div>
               </div>
 
@@ -509,26 +533,11 @@ export default function AuctionDetailPage() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Live Feed */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-yellow-500" />
-                Live Feed
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 max-h-64 overflow-y-auto">
-              {notifications.length === 0 ? (
-                <p className="text-gray-400 text-sm">No activity yet...</p>
-              ) : (
-                notifications.map((notification, index) => (
-                  <div key={index} className="text-sm text-gray-300 p-2 bg-gray-800/50 rounded">
-                    {notification}
-                  </div>
-                ))
-              )}
-              <div ref={notificationsEndRef} />
-            </CardContent>
-          </Card>
+          <LiveFeed 
+            experienceId={params.experienceId}
+            currentUserId={currentUserId}
+            maxItems={15}
+          />
 
           {/* Recent Bids */}
           <Card>

@@ -10,75 +10,71 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get the file from the request
     const formData = await request.formData()
     const file = formData.get('file') as File
+    const auctionId = formData.get('auctionId') as string
+    const experienceId = formData.get('experienceId') as string
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+    if (!file || !auctionId || !experienceId) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Validate file size (100MB limit)
-    const maxSize = 100 * 1024 * 1024 // 100MB
-    if (file.size > maxSize) {
-      return NextResponse.json({ error: 'File too large. Maximum size is 100MB' }, { status: 400 })
+    // Verify user is the seller of this auction
+    const { data: auction, error: auctionError } = await supabaseServer
+      .from('auctions')
+      .select('created_by_user_id, type, status')
+      .eq('id', auctionId)
+      .eq('experience_id', experienceId)
+      .single()
+
+    if (auctionError || !auction) {
+      return NextResponse.json({ error: 'Auction not found' }, { status: 404 })
     }
 
-    // Validate file type
-    const allowedTypes = [
-      'application/pdf',
-      'application/zip',
-      'application/x-rar-compressed',
-      'video/mp4',
-      'video/quicktime',
-      'video/x-msvideo',
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/gif',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'text/plain',
-      'application/json',
-      'application/xml',
-    ]
-
-    if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json({ error: 'File type not allowed' }, { status: 400 })
+    if (auction.created_by_user_id !== userContext.userId) {
+      return NextResponse.json({ error: 'Only the seller can upload files' }, { status: 403 })
     }
 
-    // Generate unique filename
-    const timestamp = Date.now()
+    if (auction.type !== 'DIGITAL') {
+      return NextResponse.json({ error: 'Only digital auctions can have file uploads' }, { status: 400 })
+    }
+
+    // Generate unique file path
     const fileExtension = file.name.split('.').pop()
-    const fileName = `${userContext.userId}/${timestamp}.${fileExtension}`
+    const fileName = `${auctionId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExtension}`
+    const filePath = `digital-assets/${fileName}`
 
-    // Upload to Supabase Storage
-    const { data, error } = await supabaseServer.storage
+    // Upload file to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabaseServer.storage
       .from('digital-assets')
       .upload(fileName, file, {
         cacheControl: '3600',
         upsert: false
       })
 
-    if (error) {
-      console.error('Storage upload error:', error)
+    if (uploadError) {
+      console.error('Storage upload error:', uploadError)
       return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 })
     }
 
-    // Get the public URL
-    const { data: urlData } = supabaseServer.storage
-      .from('digital-assets')
-      .getPublicUrl(fileName)
+    // Update auction with file path
+    const { error: updateError } = await supabaseServer
+      .from('auctions')
+      .update({
+        digital_file_path: filePath,
+        digital_delivery_type: 'FILE'
+      })
+      .eq('id', auctionId)
+
+    if (updateError) {
+      console.error('Error updating auction:', updateError)
+      return NextResponse.json({ error: 'Failed to update auction' }, { status: 500 })
+    }
 
     return NextResponse.json({
       success: true,
-      filePath: fileName,
-      url: urlData.publicUrl,
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type
+      filePath: filePath,
+      fileName: file.name
     })
 
   } catch (error) {

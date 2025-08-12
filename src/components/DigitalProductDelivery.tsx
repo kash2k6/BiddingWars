@@ -10,6 +10,8 @@ interface DigitalProductDeliveryProps {
   auction: {
     id: string
     type: 'DIGITAL' | 'PHYSICAL'
+    created_by_user_id: string
+    experience_id: string
     digital_delivery_type?: 'FILE' | 'DISCOUNT_CODE' | 'DOWNLOAD_LINK'
     digital_file_path?: string
     digital_discount_code?: string
@@ -17,13 +19,16 @@ interface DigitalProductDeliveryProps {
     digital_instructions?: string
   }
   isWinner: boolean
+  currentUserId?: string
 }
 
-export function DigitalProductDelivery({ auction, isWinner }: DigitalProductDeliveryProps) {
+export function DigitalProductDelivery({ auction, isWinner, currentUserId }: DigitalProductDeliveryProps) {
   const { toast } = useToast()
   const [copied, setCopied] = useState<string | null>(null)
 
-  if (auction.type !== 'DIGITAL' || !isWinner) {
+  const isSeller = currentUserId === auction.created_by_user_id
+
+  if (auction.type !== 'DIGITAL' || (!isWinner && !isSeller)) {
     return null
   }
 
@@ -199,4 +204,41 @@ export function DigitalProductDelivery({ auction, isWinner }: DigitalProductDeli
       </div>
     </div>
   )
+
+  // Seller view - show delivery status
+  if (isSeller) {
+    return (
+      <div className="border rounded-lg p-6 bg-gradient-to-r from-blue-50 to-green-50 border-blue-200">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+          <h3 className="text-lg font-semibold text-blue-900">📦 Digital Product Delivery Status</h3>
+        </div>
+
+        <div className="space-y-4">
+          <div className="border rounded-lg p-4 bg-white">
+            <h4 className="font-medium text-gray-900 mb-2">Delivery Method</h4>
+            <p className="text-sm text-gray-600">
+              {auction.digital_delivery_type === 'FILE' && 'File Upload'}
+              {auction.digital_delivery_type === 'DISCOUNT_CODE' && 'Discount Code'}
+              {auction.digital_delivery_type === 'DOWNLOAD_LINK' && 'Download Link'}
+            </p>
+          </div>
+
+          {auction.digital_instructions && (
+            <div className="border rounded-lg p-4 bg-white">
+              <h4 className="font-medium text-gray-900 mb-2">📝 Instructions</h4>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                {auction.digital_instructions}
+              </p>
+            </div>
+          )}
+
+          <div className="text-center p-4 bg-blue-50 rounded-lg">
+            <p className="text-blue-800 font-medium">✅ Digital product is ready for delivery</p>
+            <p className="text-blue-600 text-sm mt-1">The winner will be able to access this content once payment is completed.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 }

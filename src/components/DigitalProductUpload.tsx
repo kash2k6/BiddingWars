@@ -22,9 +22,11 @@ interface DigitalProductUploadProps {
   value: DigitalProductData
   onChange: (data: DigitalProductData) => void
   disabled?: boolean
+  auctionId?: string
+  experienceId?: string
 }
 
-export function DigitalProductUpload({ value, onChange, disabled }: DigitalProductUploadProps) {
+export function DigitalProductUpload({ value, onChange, disabled, auctionId, experienceId }: DigitalProductUploadProps) {
   const { toast } = useToast()
   const [uploading, setUploading] = useState(false)
 
@@ -35,6 +37,8 @@ export function DigitalProductUpload({ value, onChange, disabled }: DigitalProdu
     try {
       const formData = new FormData()
       formData.append('file', file)
+      if (auctionId) formData.append('auctionId', auctionId)
+      if (experienceId) formData.append('experienceId', experienceId)
 
       const response = await fetch('/api/upload-digital-file', {
         method: 'POST',

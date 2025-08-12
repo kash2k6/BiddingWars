@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
+import { Clock, Zap, Flame, Target, AlertTriangle } from "lucide-react"
 
 interface CountdownProps {
   endTime: string
   onEnd?: () => void
   className?: string
+  variant?: 'default' | 'critical' | 'warning' | 'success'
 }
 
-export function Countdown({ endTime, onEnd, className }: CountdownProps) {
+export function Countdown({ endTime, onEnd, className, variant = 'default' }: CountdownProps) {
   const [timeLeft, setTimeLeft] = useState<{
     days: number
     hours: number
@@ -17,6 +19,7 @@ export function Countdown({ endTime, onEnd, className }: CountdownProps) {
     seconds: number
   }>({ days: 0, hours: 0, minutes: 0, seconds: 0 })
   const [isEnded, setIsEnded] = useState(false)
+  const [pulseIntensity, setPulseIntensity] = useState(1)
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -36,6 +39,17 @@ export function Countdown({ endTime, onEnd, className }: CountdownProps) {
         const seconds = Math.floor((difference % (1000 * 60)) / 1000)
 
         setTimeLeft({ days, hours, minutes, seconds })
+
+        // Increase pulse intensity as time runs out
+        if (minutes === 0 && seconds <= 30) {
+          setPulseIntensity(3)
+        } else if (minutes === 0 && seconds <= 60) {
+          setPulseIntensity(2)
+        } else if (minutes <= 5) {
+          setPulseIntensity(1.5)
+        } else {
+          setPulseIntensity(1)
+        }
       }
     }, 1000)
 
@@ -44,6 +58,30 @@ export function Countdown({ endTime, onEnd, className }: CountdownProps) {
 
   const formatTime = (time: number) => time.toString().padStart(2, '0')
   
+  const getMilitaryStatus = () => {
+    if (timeLeft.days > 0) return 'DEPLOYMENT'
+    if (timeLeft.hours > 0) return 'MISSION ACTIVE'
+    if (timeLeft.minutes > 5) return 'ENGAGEMENT'
+    if (timeLeft.minutes > 0) return 'FINAL STRIKE'
+    if (timeLeft.seconds > 30) return 'CRITICAL'
+    return 'NUCLEAR'
+  }
+
+  const getStatusColor = () => {
+    if (timeLeft.minutes === 0 && timeLeft.seconds <= 30) return 'from-red-600 to-red-800'
+    if (timeLeft.minutes === 0 && timeLeft.seconds <= 60) return 'from-orange-500 to-red-600'
+    if (timeLeft.minutes <= 5) return 'from-yellow-500 to-orange-500'
+    if (timeLeft.hours === 0) return 'from-blue-500 to-purple-600'
+    return 'from-green-500 to-blue-600'
+  }
+
+  const getStatusIcon = () => {
+    if (timeLeft.minutes === 0 && timeLeft.seconds <= 30) return <Flame className="h-3 w-3" />
+    if (timeLeft.minutes === 0 && timeLeft.seconds <= 60) return <AlertTriangle className="h-3 w-3" />
+    if (timeLeft.minutes <= 5) return <Zap className="h-3 w-3" />
+    return <Target className="h-3 w-3" />
+  }
+
   const formatDisplay = () => {
     if (timeLeft.days > 0) {
       return `${timeLeft.days}d ${formatTime(timeLeft.hours)}h ${formatTime(timeLeft.minutes)}m ${formatTime(timeLeft.seconds)}s`
@@ -56,16 +94,17 @@ export function Countdown({ endTime, onEnd, className }: CountdownProps) {
     }
   }
 
-  // Add flame effect for last 30 seconds or random chance
-  const isLast30Seconds = timeLeft.minutes === 0 && timeLeft.seconds <= 30
-  const hasFlames = isLast30Seconds || Math.random() < 0.1 // 10% chance for random flames
+  const isCritical = timeLeft.minutes === 0 && timeLeft.seconds <= 30
+  const isWarning = timeLeft.minutes === 0 && timeLeft.seconds <= 60
+  const isEngagement = timeLeft.minutes <= 5
 
   if (isEnded) {
     return (
       <div className={`text-center ${className}`}>
-        <div className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-2 py-1 rounded shadow-lg border border-gray-500/50">
-          <div className="text-xs tracking-wide">
-            ENDED
+        <div className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-3 py-2 rounded-lg shadow-lg border border-gray-500/50 transform transition-all duration-300">
+          <div className="flex items-center justify-center gap-2">
+            <div className="w-2 h-2 bg-gray-400 rounded-full" />
+            <span className="text-sm font-bold tracking-wider">MISSION COMPLETE</span>
           </div>
         </div>
       </div>
@@ -74,19 +113,70 @@ export function Countdown({ endTime, onEnd, className }: CountdownProps) {
 
   return (
     <div className={`text-center ${className}`}>
-      <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-2 py-1 rounded shadow-lg border border-red-400/50">
-        <div className="flex items-center justify-center gap-1 mb-1">
-          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-          <span className="text-xs font-medium">LIVE</span>
+      <div 
+        className={`
+          bg-gradient-to-r ${getStatusColor()} 
+          text-white px-3 py-2 rounded-lg shadow-lg border border-white/20
+          transform transition-all duration-300
+          ${isCritical ? 'animate-pulse scale-105' : ''}
+          ${isWarning ? 'animate-bounce' : ''}
+          ${isEngagement ? 'animate-pulse' : ''}
+        `}
+        style={{
+          animationDuration: `${pulseIntensity}s`
+        }}
+      >
+        {/* Status Bar */}
+        <div className="flex items-center justify-center gap-2 mb-1">
+          <div className={`w-2 h-2 bg-white rounded-full ${isCritical ? 'animate-ping' : 'animate-pulse'}`} />
+          <span className="text-xs font-bold tracking-wider uppercase">
+            {getMilitaryStatus()}
+          </span>
+          {getStatusIcon()}
         </div>
-        <div className="text-sm tracking-wider font-mono relative">
+
+        {/* Countdown Display */}
+        <div className="text-sm tracking-wider font-mono font-bold relative">
           {formatDisplay()}
-          {hasFlames && (
-            <div className="absolute -top-1 -right-1 text-xs animate-bounce">
-              🔥
+          
+          {/* Critical Effects */}
+          {isCritical && (
+            <>
+              <div className="absolute -top-1 -right-1 text-lg animate-bounce">
+                🔥
+              </div>
+              <div className="absolute -bottom-1 -left-1 text-lg animate-ping">
+                ⚡
+              </div>
+            </>
+          )}
+          
+          {/* Warning Effects */}
+          {isWarning && !isCritical && (
+            <div className="absolute -top-1 -right-1 text-sm animate-pulse">
+              ⚠️
+            </div>
+          )}
+          
+          {/* Engagement Effects */}
+          {isEngagement && !isWarning && (
+            <div className="absolute -top-1 -right-1 text-sm animate-bounce">
+              🎯
             </div>
           )}
         </div>
+
+        {/* Progress Bar for last 5 minutes */}
+        {timeLeft.minutes <= 5 && (
+          <div className="mt-1 w-full bg-black/20 rounded-full h-1">
+            <div 
+              className="bg-white h-1 rounded-full transition-all duration-1000 ease-out"
+              style={{
+                width: `${((timeLeft.minutes * 60 + timeLeft.seconds) / (5 * 60)) * 100}%`
+              }}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

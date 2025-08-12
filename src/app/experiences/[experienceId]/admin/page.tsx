@@ -1,8 +1,17 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { checkAdminPermissions, AdminUser } from "@/lib/admin-permissions"
+import { getWhopContext } from "@/lib/whop-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
+interface AdminUser {
+  userId: string
+  experienceId: string
+  companyId?: string
+  isAdmin: boolean
+  role: 'owner' | 'admin' | 'user'
+  companyName?: string
+}
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -66,7 +75,29 @@ export default function AdminPage({ params }: { params: { experienceId: string }
     async function checkAdmin() {
       try {
         setLoading(true)
-        const admin = await checkAdminPermissions()
+        
+        // Get Whop context first
+        const context = await getWhopContext()
+        if (!context) {
+          throw new Error('Failed to get Whop context')
+        }
+
+        // Check admin permissions using the API
+        const response = await fetch('/api/admin/check-permissions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-whop-user-token': context.userId,
+            'x-whop-experience-id': context.experienceId,
+            'x-whop-company-id': context.companyId || '',
+          },
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to check admin permissions')
+        }
+
+        const admin: AdminUser = await response.json()
         setAdminUser(admin)
         
         if (!admin.isAdmin) {
@@ -77,9 +108,10 @@ export default function AdminPage({ params }: { params: { experienceId: string }
             variant: "destructive",
           })
         } else {
-          // Load admin data using environment company ID
-          const companyId = process.env.NEXT_PUBLIC_WHOP_COMPANY_ID || 'biz_PHQfLZ3o2GvXQn'
-          await loadReceipts(companyId)
+          // Load admin data using the company ID from the API response
+          if (admin.companyId) {
+            await loadReceipts(admin.companyId)
+          }
         }
       } catch (error) {
         console.error("Failed to check admin permissions:", error)

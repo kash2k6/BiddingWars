@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { getWhopContext } from "@/lib/whop-context"
 import { AuctionCard } from "@/components/AuctionCard"
+import { LiveFeed } from "@/components/LiveFeed"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { supabaseClient } from "@/lib/supabase-client"
@@ -285,6 +286,8 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
     }
   }
 
+
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-64">
@@ -294,50 +297,62 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-orange-500 to-red-600 bg-clip-text text-transparent">
-            🔥 LIVE AUCTIONS 🔥
-          </h2>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-            <span className="text-sm text-red-600 font-semibold">LIVE</span>
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* Main Content */}
+      <div className="lg:col-span-3 space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-orange-500 to-red-600 bg-clip-text text-transparent">
+              🔥 LIVE AUCTIONS 🔥
+            </h2>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              <span className="text-sm text-red-600 font-semibold">LIVE</span>
+            </div>
           </div>
+          <Badge variant="secondary" className="bg-gradient-to-r from-orange-500 to-red-600 text-white font-bold">
+            {auctions.length} ACTIVE AUCTIONS
+          </Badge>
         </div>
-        <Badge variant="secondary" className="bg-gradient-to-r from-orange-500 to-red-600 text-white font-bold">
-          {auctions.length} ACTIVE AUCTIONS
-        </Badge>
+
+        {auctions.length === 0 ? (
+          <div className="text-center py-12">
+            <h3 className="text-lg font-medium mb-2">No active auctions</h3>
+            <p className="text-muted-foreground mb-4">
+              Check back later or create your own auction!
+            </p>
+            <Button asChild>
+              <a href={`/experiences/${params.experienceId}/create`}>
+                Create Auction
+              </a>
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {auctions.map((auction) => (
+              <AuctionCard
+                key={auction.id}
+                auction={auction}
+                currentBid={currentBids[auction.id]}
+                currentBids={currentBids}
+                onBid={handleBid}
+                onBuyNow={handleBuyNow}
+                onMarkReceived={handleMarkReceived}
+                currentUserId={currentUserId || undefined}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {auctions.length === 0 ? (
-        <div className="text-center py-12">
-          <h3 className="text-lg font-medium mb-2">No active auctions</h3>
-          <p className="text-muted-foreground mb-4">
-            Check back later or create your own auction!
-          </p>
-          <Button asChild>
-            <a href={`/experiences/${params.experienceId}/create`}>
-              Create Auction
-            </a>
-          </Button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-          {auctions.map((auction) => (
-            <AuctionCard
-              key={auction.id}
-              auction={auction}
-              currentBid={currentBids[auction.id]}
-              currentBids={currentBids}
-              onBid={handleBid}
-              onBuyNow={handleBuyNow}
-              onMarkReceived={handleMarkReceived}
-              currentUserId={currentUserId || undefined}
-            />
-          ))}
-        </div>
-      )}
+      {/* Sidebar with Live Feed */}
+      <div className="lg:col-span-1 space-y-6">
+        <LiveFeed 
+          experienceId={params.experienceId}
+          currentUserId={currentUserId || undefined}
+          maxItems={20}
+        />
+      </div>
     </div>
   )
 }

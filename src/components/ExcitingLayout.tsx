@@ -1,6 +1,7 @@
 "use client"
 
 import { ReactNode } from "react"
+import { usePathname } from "next/navigation"
 import { NavTabs } from "./NavTabs"
 import { SpendingPowerBadge } from "./SpendingPowerBadge"
 
@@ -12,6 +13,11 @@ interface ExcitingLayoutProps {
 }
 
 export function ExcitingLayout({ children, experienceId, userId, companyId }: ExcitingLayoutProps) {
+  const pathname = usePathname()
+  
+  // Check if we're on an auction detail page
+  const isAuctionDetailPage = pathname.includes('/auction/')
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
       {/* Animated background elements */}
@@ -88,12 +94,14 @@ export function ExcitingLayout({ children, experienceId, userId, companyId }: Ex
           </div>
         </header>
 
-        {/* Navigation */}
-        <div className="bg-gradient-to-r from-slate-800/60 to-purple-800/60 backdrop-blur-sm border-b border-purple-500/20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <NavTabs experienceId={experienceId} />
+        {/* Navigation - Hide on auction detail pages */}
+        {!isAuctionDetailPage && (
+          <div className="bg-gradient-to-r from-slate-800/60 to-purple-800/60 backdrop-blur-sm border-b border-purple-500/20">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <NavTabs experienceId={experienceId} />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Main content area */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

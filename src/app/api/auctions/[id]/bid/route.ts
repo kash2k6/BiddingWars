@@ -106,7 +106,8 @@ export async function POST(
           params.id,
           auction?.title || 'Auction',
           previousTopBid.amount_cents || 0,
-          amountCents
+          amountCents,
+          experienceId
         )
         console.log('Bid alert sent to previous highest bidder')
       } catch (error) {
