@@ -57,10 +57,10 @@ export function PaymentHandler({
       })
       
       if (response.ok) {
-        const inAppPurchase = await response.json()
+        const chargeResult = await response.json()
         
         // 2. Use the createInAppPurchase function from whop-client
-        const res = await createInAppPurchase(inAppPurchase.id || 'mock-purchase-id')
+        const res = await createInAppPurchase(chargeResult)
         
         if (res.success) {
           setReceiptId(res.receiptId)
