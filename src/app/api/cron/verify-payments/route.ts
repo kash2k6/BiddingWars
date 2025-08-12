@@ -44,14 +44,15 @@ export async function POST(request: NextRequest) {
           appApiKey: process.env.WHOP_API_KEY!
         })
 
-        // Get the charge details from Whop
-        const charge = await whopSdk.payments.retrieveCharge({
-          chargeId: item.payment_id!
+        // Check if user has access to the plan (this verifies payment was successful)
+        const hasAccess = await whopSdk.access.checkIfUserHasAccessToAccessPass({
+          accessPassId: item.plan_id,
+          userId: item.user_id
         })
 
-        console.log(`Checking payment status for item ${item.id}:`, charge.status)
-
-        if (charge.status === 'paid') {
+        console.log(`Checking payment status for item ${item.id}: User has access to plan ${item.plan_id}: ${hasAccess.hasAccess}`)
+        
+        if (hasAccess.hasAccess) {
           // Payment confirmed - update barracks item status
           const { error: updateError } = await supabaseServer
             .from('barracks_items')
@@ -105,7 +106,8 @@ export async function POST(request: NextRequest) {
           console.log(`Payment verified for item ${item.id} - Item now accessible in barracks`)
           verifiedCount++
 
-        } else if (charge.status === 'failed' || charge.status === 'canceled') {
+        } else {
+          // User doesn't have access - payment failed or was canceled
           // Payment failed - remove from barracks and reset auction
           const { error: deleteError } = await supabaseServer
             .from('barracks_items')
