@@ -57,6 +57,7 @@ export async function POST(
 
     let totalAmount: number
     let paymentDescription: string
+    let bidId: string | undefined
 
     if (buyNow) {
       // Buy Now scenario
@@ -70,6 +71,7 @@ export async function POST(
       
       totalAmount = amount + (auction.shipping_cost_cents || 0)
       paymentDescription = `Buy Now purchase for auction: ${auction.title}`
+      bidId = undefined // No bid ID for buy now
     } else {
       // Regular auction win scenario
       const { data: topBid, error: bidError } = await supabaseServer
@@ -92,6 +94,7 @@ export async function POST(
 
       totalAmount = topBid.amount_cents + (auction.shipping_cost_cents || 0)
       paymentDescription = `Payment for auction: ${auction.title}`
+      bidId = topBid.id
     }
 
     // Calculate commission breakdown
@@ -117,7 +120,7 @@ export async function POST(
       metadata: {
         auctionId: params.id,
         experienceId,
-        bidId: buyNow ? undefined : topBid.id,
+        bidId,
         breakdown
       }
     })
