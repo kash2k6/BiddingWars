@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency } from "@/lib/payouts"
 import { DollarSign, CheckCircle, XCircle, Loader2 } from "lucide-react"
-import { useIframeSdk } from "@whop/react"
+
 
 interface PaymentHandlerProps {
   auctionId: string
@@ -24,10 +24,8 @@ export function PaymentHandler({
 }: PaymentHandlerProps) {
   const [loading, setLoading] = useState(false)
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle')
-  const [receiptId, setReceiptId] = useState<string>()
   const [error, setError] = useState<string>()
   const { toast } = useToast()
-  const iframeSdk = useIframeSdk()
   
   console.log('PaymentHandler props:', { auctionId, amount, disabled })
 
@@ -46,45 +44,36 @@ export function PaymentHandler({
       }
       const context = await contextResponse.json()
 
-      // 1. Create charge on server
-      const response = await fetch("/api/charge", {
+      // Create charge and process payment
+      const response = await fetch(`/api/auctions/${auctionId}/finalize`, {
         method: "POST",
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ 
+          auctionId,
           userId: context.userId, 
           experienceId: context.experienceId,
-          amount: amount,
-          currency: 'usd',
-          metadata: {
-            auctionId: auctionId,
-            type: 'auction_payment'
-          }
+          companyId: context.companyId,
+          type: 'buy_now'
         }),
       })
       
       if (response.ok) {
-        const inAppPurchase = await response.json()
+        const result = await response.json()
+        setPaymentStatus('success')
+        setError(undefined)
         
-        // 2. Open payment modal
-        const res = await iframeSdk.inAppPurchase(inAppPurchase)
-        
-        if (res.status === "ok") {
-          setReceiptId(res.data.receiptId)
-          setPaymentStatus('success')
-          setError(undefined)
-          
-          toast({
-            title: "Payment Successful! 🎉",
-            description: `You've won the auction for ${formatCurrency(amount)}!`,
-          })
-          onSuccess?.()
-        } else {
-          setReceiptId(undefined)
-          setPaymentStatus('failed')
-          setError(res.error)
-          throw new Error(res.error || 'Payment failed')
-        }
+        toast({
+          title: "Payment Successful! 🎉",
+          description: `You've won the auction for ${formatCurrency(amount)}!`,
+        })
+        onSuccess?.()
       } else {
-        throw new Error("Failed to create charge")
+        const errorData = await response.json()
+        setPaymentStatus('failed')
+        setError(errorData.error || 'Payment failed')
+        throw new Error(errorData.error || 'Payment failed')
       }
     } catch (error) {
       console.error('Payment error:', error)
