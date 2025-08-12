@@ -42,6 +42,7 @@ export default function CreateListingPage({ params }: { params: { experienceId: 
   const [loading, setLoading] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editingAuctionId, setEditingAuctionId] = useState<string | null>(null)
+  const [currentTime, setCurrentTime] = useState(new Date())
   const [form, setForm] = useState<CreateListingForm>({
     title: '',
     description: '',
@@ -58,6 +59,15 @@ export default function CreateListingPage({ params }: { params: { experienceId: 
       deliveryType: 'FILE',
     },
   })
+
+  // Update current time every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date())
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [])
 
                 const handleSubmit = async (e: React.FormEvent) => {
                 e.preventDefault()
@@ -380,6 +390,91 @@ export default function CreateListingPage({ params }: { params: { experienceId: 
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Timezone Information */}
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Calendar className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-800">⏰ Timezone Information</span>
+                  </div>
+                  <div className="text-xs text-blue-700 space-y-1">
+                    <p><strong>Current Time:</strong> {currentTime.toLocaleString()}</p>
+                    <p><strong>Your Timezone:</strong> {Intl.DateTimeFormat().resolvedOptions().timeZone}</p>
+                    <p><strong>Database Timezone:</strong> UTC (All times are stored in UTC)</p>
+                    <p className="text-blue-600 font-medium">💡 Tip: Times will be automatically converted to UTC when saved</p>
+                </div>
+                
+                {/* Quick Time Presets */}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date()
+                      const end = new Date(now.getTime() + 30 * 60 * 1000) // 30 minutes
+                      setForm(prev => ({
+                        ...prev,
+                        startsAt: now.toISOString().slice(0, 16),
+                        endsAt: end.toISOString().slice(0, 16)
+                      }))
+                    }}
+                    className="text-xs"
+                  >
+                    30 min
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date()
+                      const end = new Date(now.getTime() + 60 * 60 * 1000) // 1 hour
+                      setForm(prev => ({
+                        ...prev,
+                        startsAt: now.toISOString().slice(0, 16),
+                        endsAt: end.toISOString().slice(0, 16)
+                      }))
+                    }}
+                    className="text-xs"
+                  >
+                    1 hour
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date()
+                      const end = new Date(now.getTime() + 24 * 60 * 60 * 1000) // 24 hours
+                      setForm(prev => ({
+                        ...prev,
+                        startsAt: now.toISOString().slice(0, 16),
+                        endsAt: end.toISOString().slice(0, 16)
+                      }))
+                    }}
+                    className="text-xs"
+                  >
+                    24 hours
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date()
+                      const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) // 7 days
+                      setForm(prev => ({
+                        ...prev,
+                        startsAt: now.toISOString().slice(0, 16),
+                        endsAt: end.toISOString().slice(0, 16)
+                      }))
+                    }}
+                    className="text-xs"
+                  >
+                    7 days
+                  </Button>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium mb-2">Start Time</label>
                   <input
@@ -389,6 +484,14 @@ export default function CreateListingPage({ params }: { params: { experienceId: 
                     className="w-full px-3 py-2 border rounded-md"
                     required
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Will start at: {form.startsAt ? new Date(form.startsAt).toLocaleString() : 'Not set'}
+                  </p>
+                  {form.startsAt && new Date(form.startsAt) < currentTime && (
+                    <p className="text-xs text-red-600 mt-1">
+                      ⚠️ Start time is in the past! Auction will start immediately.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -400,6 +503,19 @@ export default function CreateListingPage({ params }: { params: { experienceId: 
                     className="w-full px-3 py-2 border rounded-md"
                     required
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Will end at: {form.endsAt ? new Date(form.endsAt).toLocaleString() : 'Not set'}
+                  </p>
+                  {form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt) && (
+                    <p className="text-xs text-red-600 mt-1">
+                      ⚠️ End time must be after start time!
+                    </p>
+                  )}
+                  {form.endsAt && new Date(form.endsAt) < currentTime && (
+                    <p className="text-xs text-red-600 mt-1">
+                      ⚠️ End time is in the past! Please set a future end time.
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
