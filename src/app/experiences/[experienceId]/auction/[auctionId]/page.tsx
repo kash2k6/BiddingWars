@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { getWhopContext } from "@/lib/whop-context"
 import { supabaseClient } from "@/lib/supabase-client"
+import { getIframeContext, createInAppPurchase } from "@/lib/whop-client"
 import { formatCurrency } from "@/lib/payouts"
 import { Countdown } from "@/components/Countdown"
 import { ExcitingBidButton } from "@/components/ExcitingBidButton"
@@ -269,7 +270,39 @@ export default function AuctionDetailPage() {
     if (!auction || !currentUserId) return
 
     try {
-      const response = await fetch(`/api/auctions/${auction.id}/finalize`, {
+      // First, process the payment through PaymentHandler
+      const context = await getIframeContext()
+      
+      // Create charge for buy now purchase
+      const chargeResponse = await fetch("/api/charge", {
+        method: "POST",
+        body: JSON.stringify({ 
+          userId: context.userId, 
+          experienceId: context.experienceId,
+          amount: auction.buy_now_price_cents,
+          currency: 'usd',
+          metadata: {
+            auctionId: auction.id,
+            type: 'buy_now_purchase'
+          }
+        }),
+      })
+      
+      if (!chargeResponse.ok) {
+        throw new Error("Failed to create charge")
+      }
+      
+      const inAppPurchase = await chargeResponse.json()
+      
+      // Process the payment
+      const res = await createInAppPurchase(inAppPurchase.id || 'mock-purchase-id')
+      
+      if (!res.success) {
+        throw new Error('Payment failed')
+      }
+
+      // Now finalize the auction
+      const finalizeResponse = await fetch(`/api/auctions/${auction.id}/finalize`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -278,24 +311,33 @@ export default function AuctionDetailPage() {
           userId: currentUserId,
           experienceId: auction.experience_id,
           companyId: undefined,
+          buyNow: true,
+          amount: auction.buy_now_price_cents
         }),
       })
 
-      const result = await response.json()
+      const result = await finalizeResponse.json()
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to buy now')
+      if (!finalizeResponse.ok) {
+        throw new Error(result.error || 'Failed to finalize purchase')
       }
 
+      // Update local auction state
+      setAuction(prev => prev ? {
+        ...prev,
+        status: 'PAID',
+        winner_user_id: currentUserId
+      } : null)
+
       toast({
-        title: "Purchase Complete!",
+        title: "Purchase Complete! 🎉",
         description: "You have successfully purchased this item.",
       })
     } catch (error) {
-      console.error('Error buying now:', error)
+      console.error('Error processing buy now purchase:', error)
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to complete purchase",
+        description: error instanceof Error ? error.message : "Failed to process purchase",
         variant: "destructive",
       })
     }
