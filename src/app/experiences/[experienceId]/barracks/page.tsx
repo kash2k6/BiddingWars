@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast'
 
 interface PurchasedItem {
   id: string
+  auction_id?: string
   title: string
   description: string
   type: 'PHYSICAL' | 'DIGITAL'
@@ -80,7 +81,8 @@ export default function BarracksPage() {
 
       if (barracksItems) {
         setPurchasedItems(barracksItems.map(item => ({
-          id: item.auction_id,
+          id: item.id || item.auction_id, // Use barracks item ID if available, fallback to auction_id
+          auction_id: item.auction_id,
           title: item.title,
           description: item.description,
           type: item.auction_type,
