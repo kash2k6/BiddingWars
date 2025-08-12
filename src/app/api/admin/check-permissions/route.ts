@@ -47,11 +47,32 @@ export async function POST(request: NextRequest) {
       console.log('Company ID from experience:', companyId)
       console.log('Company name from experience:', companyName)
 
-      // For development/testing, grant admin access
-      // In production, you would verify the user is the company owner
-      isAdmin = true
-      role = 'owner'
-      console.log('Granting admin access for development/testing')
+      // Check if the current user is the company owner
+      try {
+        const company = await experienceSdk.companies.getCompany({
+          id: companyId
+        })
+
+        console.log('Company details:', company)
+        console.log('Company owner ID:', company?.company?.owner?.id)
+        console.log('Current user ID:', actualUserId)
+
+        if (company?.company?.owner?.id === actualUserId) {
+          isAdmin = true
+          role = 'owner'
+          console.log('User is company owner - granting admin access')
+        } else {
+          isAdmin = false
+          role = 'user'
+          console.log('User is not company owner - denying admin access')
+        }
+      } catch (companyError) {
+        console.log('Could not verify company ownership:', companyError)
+        // For security, deny access if we can't verify
+        isAdmin = false
+        role = 'user'
+        console.log('Denying admin access - could not verify ownership')
+      }
 
     } catch (experienceError) {
       console.log('Could not get experience details:', experienceError)
