@@ -126,17 +126,18 @@ export function AuctionCard({
                       {auction.description}
                     </p>
                     
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-sm text-gray-400">Current Bid</p>
-                        <p className="text-xl font-bold text-white">
-                          {formatCurrency(currentBid || auction.start_price_cents)}
-                        </p>
-                      </div>
-                    <div className="text-center mt-2">
+                    {/* Current Bid - Dedicated row */}
+                    <div className="text-center">
+                      <p className="text-sm text-gray-400 mb-1">Current Bid</p>
+                      <p className="text-2xl font-bold text-white">
+                        {formatCurrency(currentBid || auction.start_price_cents)}
+                      </p>
+                    </div>
+
+                    {/* Countdown - Dedicated row */}
+                    <div className="text-center">
                       <p className="text-xs font-medium text-orange-300 mb-1">⏰ ENDS IN</p>
                       <Countdown endTime={auction.ends_at} />
-                    </div>
                     </div>
 
                     {auction.buy_now_price_cents && (
