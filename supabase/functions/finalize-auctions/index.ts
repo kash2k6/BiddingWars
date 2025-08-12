@@ -97,6 +97,43 @@ serve(async (req) => {
           continue
         }
 
+        // Automatically create barracks item for the winner
+        const { error: barracksError } = await supabase
+          .from('barracks_items')
+          .insert({
+            user_id: topBid.bidder_user_id,
+            auction_id: auction.id,
+            plan_id: `plan_${auction.id}`, // Generate a plan ID based on auction ID
+            amount_cents: topBid.amount_cents,
+            status: 'PENDING_PAYMENT',
+            paid_at: null
+          })
+
+        if (barracksError) {
+          console.error(`Error creating barracks item for auction ${auction.id}:`, barracksError)
+          errors.push(`Failed to create barracks item for auction ${auction.id}`)
+        } else {
+          console.log(`Created barracks item for auction ${auction.id}`)
+        }
+
+        // Also create winning_bids entry
+        const { error: winningBidError } = await supabase
+          .from('winning_bids')
+          .insert({
+            auction_id: auction.id,
+            user_id: topBid.bidder_user_id,
+            bid_id: topBid.id,
+            amount_cents: topBid.amount_cents,
+            payment_processed: false
+          })
+
+        if (winningBidError) {
+          console.error(`Error creating winning bid for auction ${auction.id}:`, winningBidError)
+          errors.push(`Failed to create winning bid for auction ${auction.id}`)
+        } else {
+          console.log(`Created winning bid entry for auction ${auction.id}`)
+        }
+
         console.log(`Auction ${auction.id} finalized with winner ${topBid.bidder_user_id}`)
         finalizedCount++
 

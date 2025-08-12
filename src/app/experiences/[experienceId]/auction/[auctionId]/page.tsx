@@ -521,6 +521,18 @@ export default function AuctionDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Timezone Helper */}
+              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-blue-400" />
+                  <div className="text-sm">
+                    <span className="text-blue-300">🕐 Current time: </span>
+                    <span className="font-mono font-bold text-blue-200">{new Date().toLocaleString()}</span>
+                    <span className="text-blue-300 ml-2">({Intl.DateTimeFormat().resolvedOptions().timeZone})</span>
+                  </div>
+                </div>
+              </div>
+
               {/* Prominent Countdown Section */}
               <div className="bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-lg p-4">
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
