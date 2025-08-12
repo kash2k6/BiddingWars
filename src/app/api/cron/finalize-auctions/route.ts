@@ -101,9 +101,12 @@ export async function POST(request: NextRequest) {
           onBehalfOfUserId: topBid.bidder_user_id
         })
 
+        // Convert amount from cents to dollars for Whop API
+        const amountInDollars = totalAmount / 100
+
         // Create the charge using Whop API
         const chargeResult = await whopSdk.payments.chargeUser({
-          amount: totalAmount,
+          amount: amountInDollars,
           currency: 'usd' as any,
           userId: topBid.bidder_user_id,
           description: `Payment for auction: ${auction.title}`,
@@ -118,9 +121,29 @@ export async function POST(request: NextRequest) {
 
         console.log('Charge result:', chargeResult)
 
-        if (!chargeResult) {
+        if (!chargeResult?.inAppPurchase) {
           console.error(`Failed to create charge for auction ${auction.id}`)
           errors.push(`Failed to create charge for auction ${auction.id}`)
+          continue
+        }
+
+        // Create checkout session for the winner
+        const checkoutSession = await whopSdk.payments.createCheckoutSession({
+          planId: chargeResult.inAppPurchase.planId,
+          metadata: {
+            auctionId: auction.id,
+            experienceId: auction.experience_id,
+            bidId: topBid.id,
+            breakdown,
+            type: 'auction_payment'
+          },
+        })
+
+        console.log('Checkout session created:', checkoutSession)
+
+        if (!checkoutSession) {
+          console.error(`Failed to create checkout session for auction ${auction.id}`)
+          errors.push(`Failed to create checkout session for auction ${auction.id}`)
           continue
         }
 
@@ -131,7 +154,9 @@ export async function POST(request: NextRequest) {
             status: 'PENDING_PAYMENT',
             winner_user_id: topBid.bidder_user_id,
             current_bid_id: topBid.id,
-            payment_id: chargeResult.inAppPurchase?.id || chargeResult.inAppPurchase?.planId,
+            payment_id: chargeResult.inAppPurchase.id,
+            plan_id: chargeResult.inAppPurchase.planId,
+            checkout_session_id: checkoutSession.id,
             updated_at: new Date().toISOString()
           })
           .eq('id', auction.id)

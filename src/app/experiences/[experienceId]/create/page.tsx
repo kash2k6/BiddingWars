@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency } from "@/lib/payouts"
 import { calculatePayouts } from "@/lib/payouts"
-import { Package, Upload, Calendar, DollarSign, Percent } from "lucide-react"
+import { Package, Upload, Calendar, DollarSign, Percent, AlertTriangle } from "lucide-react"
 import { DigitalProductUpload } from "@/components/DigitalProductUpload"
 
 interface DigitalProductData {
@@ -338,6 +338,20 @@ export default function CreateListingPage({ params }: { params: { experienceId: 
                     <p className="text-sm text-red-600 mt-1">
                       Buy now price must be greater than start price (${(form.startPriceCents / 100).toFixed(2)})
                     </p>
+                  )}
+                  {form.buyNowPriceCents && (
+                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-yellow-800">⚠️ Buy Now Warning</p>
+                          <p className="text-xs text-yellow-700 mt-1">
+                            Any user can purchase this item immediately for ${(form.buyNowPriceCents / 100).toFixed(2)}, 
+                            regardless of current bid amount. This will end the auction instantly.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
 
