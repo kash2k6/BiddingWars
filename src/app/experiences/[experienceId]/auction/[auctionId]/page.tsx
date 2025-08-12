@@ -35,6 +35,7 @@ import {
   Trophy,
   Send
 } from "lucide-react"
+import { SoundManager } from "@/lib/sound-effects"
 
 interface Auction {
   id: string
@@ -110,6 +111,9 @@ export default function AuctionDetailPage() {
       if (!params.auctionId) return
 
       try {
+        // Play dramatic entrance sound
+        await SoundManager.playPageEntrance()
+
         // Fetch auction details
         const { data: auctionData, error: auctionError } = await supabaseClient
           .from('auctions')
@@ -151,7 +155,7 @@ export default function AuctionDetailPage() {
     }
 
     fetchAuctionData()
-  }, [params.auctionId, toast])
+  }, [params.auctionId, toast, audio])
 
   // Real-time subscriptions
   useEffect(() => {

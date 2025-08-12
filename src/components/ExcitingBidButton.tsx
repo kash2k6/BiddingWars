@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { formatCurrency } from "@/lib/payouts"
 import { getBidTerminology, getBidSuccessMessage } from "@/lib/bid-terminology"
-import { Flame, Zap, Trophy, Target, Sword, Shield, Crown } from "lucide-react"
+import { Flame, Zap, Trophy, Target, Sword, Shield, Crown, Rocket } from "lucide-react"
+import { SoundManager } from "@/lib/sound-effects"
 
 interface ExcitingBidButtonProps {
   amount: number
@@ -30,9 +31,12 @@ export function ExcitingBidButton({
   
   console.log('ExcitingBidButton props:', { amount, previousAmount, disabled, loading, isWinning })
 
-  const handleClick = () => {
+  const handleClick = async () => {
     if (disabled || loading) return
     
+    // Play sound effect
+    await SoundManager.playBidSound()
+
     // Calculate bid terminology
     const terminology = getBidTerminology(amount, previousAmount)
     setBidTerminology(terminology)
@@ -65,6 +69,12 @@ export function ExcitingBidButton({
 
   const getButtonIcon = () => {
     if (isWinning) return <Crown className="h-5 w-5 animate-bounce" />
+    if (amount > previousAmount * 1.5) {
+      return <Rocket className="h-5 w-5" />
+    }
+    if (amount > previousAmount * 1.2) {
+      return <Zap className="h-5 w-5" />
+    }
     if (variant === 'aggressive') return <Sword className="h-5 w-5" />
     if (variant === 'defensive') return <Shield className="h-5 w-5" />
     if (variant === 'victory') return <Trophy className="h-5 w-5" />
@@ -74,6 +84,12 @@ export function ExcitingBidButton({
   const getButtonText = () => {
     if (loading) return 'DEPLOYING...'
     if (isWinning) return `DOMINATE ${formatCurrency(amount)}`
+    if (amount > previousAmount * 1.5) {
+      return `NUCLEAR ${formatCurrency(amount)}`
+    }
+    if (amount > previousAmount * 1.2) {
+      return `STRIKE ${formatCurrency(amount)}`
+    }
     if (variant === 'aggressive') return `STRIKE ${formatCurrency(amount)}`
     if (variant === 'defensive') return `DEFEND ${formatCurrency(amount)}`
     if (variant === 'victory') return `CONQUER ${formatCurrency(amount)}`
@@ -98,6 +114,25 @@ export function ExcitingBidButton({
         <Zap className="h-5 w-5 text-blue-400 animate-ping" style={{ animationDelay: '0.3s' }} />
       </div>
       
+      {/* Explosion particles effect */}
+      {isAnimating && (
+        <div className="absolute inset-0 pointer-events-none">
+          {[...Array(8)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-2 h-2 bg-yellow-400 rounded-full animate-ping"
+              style={{
+                left: '50%',
+                top: '50%',
+                transform: `translate(-50%, -50%) rotate(${i * 45}deg) translateY(-20px)`,
+                animationDelay: `${i * 0.1}s`,
+                animationDuration: '0.8s'
+              }}
+            />
+          ))}
+        </div>
+      )}
+
       {/* Main button */}
       <Button
         onClick={handleClick}
