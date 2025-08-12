@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { executePayouts, PayoutRequest, calculatePayoutDistribution } from '@/lib/payouts';
-import { createClient } from '@/lib/supabase-server';
+import { supabaseServer } from '@/lib/supabase-server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createClient();
+    const supabase = supabaseServer;
 
     // Get auction details
     const { data: auction, error: auctionError } = await supabase
