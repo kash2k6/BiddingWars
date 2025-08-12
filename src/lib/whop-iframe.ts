@@ -60,13 +60,20 @@ export async function getIframeContext() {
 }
 
 // Function to create in-app purchase
-export async function createInAppPurchase(inAppPurchase: any) {
+export async function createInAppPurchase(paymentData: any) {
   try {
-    console.log('Processing payment for charge:', inAppPurchase)
+    console.log('Processing payment data:', paymentData)
     
-    // Since iframe SDK is not working reliably, use the checkout URL approach
-    // The inAppPurchase object contains the checkout session ID
-    const checkoutUrl = `https://whop.com/checkout/${inAppPurchase.id}`
+    // Extract checkout session ID from the payment data
+    const checkoutSessionId = paymentData.checkoutSession?.id || paymentData.id
+    console.log('Using checkout session ID:', checkoutSessionId)
+    
+    if (!checkoutSessionId) {
+      throw new Error('No checkout session ID found in payment data')
+    }
+    
+    // Use the checkout session ID for the checkout URL
+    const checkoutUrl = `https://whop.com/checkout/${checkoutSessionId}`
     console.log('Opening checkout URL:', checkoutUrl)
     
     if (typeof window !== 'undefined') {
@@ -81,9 +88,9 @@ export async function createInAppPurchase(inAppPurchase: any) {
       
       return {
         success: true,
-        chargeId: inAppPurchase.id,
-        sessionId: inAppPurchase.id,
-        receiptId: inAppPurchase.id,
+        chargeId: paymentData.charge?.id || paymentData.id,
+        sessionId: checkoutSessionId,
+        receiptId: checkoutSessionId,
         paymentUrl: checkoutUrl,
         paymentWindow: paymentWindow
       }
@@ -96,7 +103,7 @@ export async function createInAppPurchase(inAppPurchase: any) {
     return {
       success: false,
       error: `Failed to open payment: ${error.message}`,
-      chargeId: inAppPurchase?.id,
+      chargeId: paymentData?.charge?.id || paymentData?.id,
       sessionId: null,
       receiptId: null
     }

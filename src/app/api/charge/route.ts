@@ -36,7 +36,23 @@ export async function POST(request: NextRequest) {
       throw new Error("Failed to create charge")
     }
 
-    return NextResponse.json(result.inAppPurchase)
+    // Now create a checkout session using the planId from the charge
+    const checkoutSession = await whopSdk.payments.createCheckoutSession({
+      planId: result.inAppPurchase.planId,
+      metadata: {
+        experienceId: experienceId,
+        chargeId: result.inAppPurchase.id,
+        ...metadata
+      },
+    })
+
+    console.log('Checkout session result:', checkoutSession)
+
+    // Return both the charge and checkout session
+    return NextResponse.json({
+      charge: result.inAppPurchase,
+      checkoutSession: checkoutSession
+    })
   } catch (error) {
     console.error("Error creating charge:", error)
     return NextResponse.json({ error: "Failed to create charge" }, { status: 500 })

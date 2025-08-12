@@ -252,8 +252,8 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
       
       const chargeResult = await chargeResponse.json()
       
-      // Open payment modal using the inAppPurchase object
-      const res = await createInAppPurchase(chargeResult.inAppPurchase)
+              // Open payment modal using the full payment data
+        const res = await createInAppPurchase(chargeResult)
       
       if (!res.success) {
         if (res.error) {
