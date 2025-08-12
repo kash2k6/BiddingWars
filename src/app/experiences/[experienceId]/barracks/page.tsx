@@ -103,7 +103,7 @@ export default function BarracksPage() {
 
       if (barracksItems) {
         // Fetch user names for all sellers
-        const uniqueSellerIds = [...new Set(barracksItems.map(item => item.seller_id).filter(Boolean))]
+        const uniqueSellerIds = Array.from(new Set(barracksItems.map(item => item.seller_id).filter(Boolean)))
         const userNamePromises = uniqueSellerIds.map(async (sellerId) => {
           const userName = await fetchUserName(sellerId)
           return { [sellerId]: userName }
