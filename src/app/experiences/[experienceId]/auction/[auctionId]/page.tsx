@@ -437,12 +437,12 @@ export default function AuctionDetailPage() {
           )}
 
           {/* Physical Product Fulfillment */}
-          {auction.status === 'PAID' && auction.type === 'PHYSICAL' && (
+          {auction.status === 'PAID' && auction.type === 'PHYSICAL' && currentUserId && (
             <Card>
               <CardContent className="p-0">
                 <PhysicalProductFulfillment 
                   auction={auction} 
-                  currentUserId={currentUserId || undefined} 
+                  currentUserId={currentUserId} 
                   experienceId={experienceId} 
                 />
               </CardContent>
