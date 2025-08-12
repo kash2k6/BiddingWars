@@ -98,49 +98,13 @@ serve(async (req) => {
 
         console.log(`Top bid: ${topBid.amount_cents} cents by ${topBid.bidder_user_id}`)
 
-        // Create a Whop charge for the winner
-        console.log(`Creating Whop charge for auction ${auction.id}`)
-        
-        const chargeData = {
-          amount: topBid.amount_cents,
-          currency: 'usd',
-          metadata: {
-            auctionId: auction.id,
-            auctionTitle: auction.title,
-            bidderUserId: topBid.bidder_user_id,
-            bidId: topBid.id
-          },
-          description: `Payment for auction: ${auction.title}`,
-          success_url: `${Deno.env.get('NEXT_PUBLIC_APP_URL')}/experiences/${auction.experience_id}/barracks?payment_success=true`,
-          cancel_url: `${Deno.env.get('NEXT_PUBLIC_APP_URL')}/experiences/${auction.experience_id}/barracks?payment_cancelled=true`
-        }
-
-        const chargeResponse = await fetch('https://api.whop.com/v2/charges', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${Deno.env.get('WHOP_API_KEY')}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(chargeData)
-        })
-
-        if (!chargeResponse.ok) {
-          console.error(`Failed to create charge for auction ${auction.id}:`, chargeResponse.status)
-          errors.push(`Failed to create charge for auction ${auction.id}`)
-          continue
-        }
-
-        const chargeResult = await chargeResponse.json()
-        console.log(`Created charge: ${chargeResult.id}`)
-
-        // Update auction status to PENDING_PAYMENT
+        // Update auction status to ENDED (not PENDING_PAYMENT)
         const { error: updateError } = await supabase
           .from('auctions')
           .update({
-            status: 'PENDING_PAYMENT',
+            status: 'ENDED',
             winner_user_id: topBid.bidder_user_id,
             current_bid_id: topBid.id,
-            payment_id: chargeResult.id,
             updated_at: new Date().toISOString()
           })
           .eq('id', auction.id)
@@ -151,14 +115,14 @@ serve(async (req) => {
           continue
         }
 
-        // Create barracks item with the real payment ID
+        // Create barracks item WITHOUT payment_id (will be created when user pays)
         const { error: barracksError } = await supabase
           .from('barracks_items')
           .insert({
             user_id: topBid.bidder_user_id,
             auction_id: auction.id,
-            payment_id: chargeResult.id, // Use the real Whop charge ID
-            plan_id: chargeResult.plan_id || `plan_${auction.id}`, // Use plan_id from charge if available
+            payment_id: null, // Will be set when user creates charge
+            plan_id: null, // Will be set when user creates charge
             amount_cents: topBid.amount_cents,
             status: 'PENDING_PAYMENT',
             paid_at: null
@@ -180,14 +144,14 @@ serve(async (req) => {
             bid_id: topBid.id,
             amount_cents: topBid.amount_cents,
             payment_processed: false,
-            payment_id: chargeResult.id
+            payment_id: null // Will be set when user creates charge
           })
+          .single()
 
         if (winningBidError) {
           console.error(`Error creating winning bid for auction ${auction.id}:`, winningBidError)
           errors.push(`Failed to create winning bid for auction ${auction.id}`)
-        } else {
-          console.log(`Created winning bid entry for auction ${auction.id}`)
+          continue
         }
 
         console.log(`Auction ${auction.id} finalized with winner ${topBid.bidder_user_id}`)

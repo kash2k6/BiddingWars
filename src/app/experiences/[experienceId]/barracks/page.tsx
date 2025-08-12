@@ -213,42 +213,120 @@ export default function BarracksPage() {
 
   const handleRetryPayment = async (item: PurchasedItem) => {
     try {
-      // Check if we have the Whop iApp purchase available
-      if (typeof window !== 'undefined' && (window as any).Whop) {
-        const whop = (window as any).Whop
+      // If this is a won auction without a plan_id, create a charge first
+      if (!item.plan_id && item.auction_id) {
+        console.log('Creating charge for won auction:', item.auction_id)
         
-        // Open the payment modal using the existing plan ID
-        const result = await whop.openPurchaseModal({
-          planId: item.plan_id,
-          onSuccess: () => {
-            toast({
-              title: "Payment Successful! 🎉",
-              description: "Your payment has been processed. The item will be available shortly once verified.",
-            })
-            // Refresh the items to show updated status
-            loadPurchasedItems()
-          },
-          onError: (error: any) => {
-            console.error('Payment error:', error)
-            toast({
-              title: "Payment Failed",
-              description: "There was an issue processing your payment. Please try again.",
-              variant: "destructive",
-            })
-          },
-          onClose: () => {
-            console.log('Payment modal closed')
-          }
+        const response = await fetch('/api/charge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: context.userId,
+            experienceId: context.experienceId,
+            amount: item.amount_cents,
+            currency: 'usd',
+            metadata: {
+              auctionId: item.auction_id,
+              type: 'auction_win'
+            }
+          })
         })
+
+        if (!response.ok) {
+          throw new Error('Failed to create charge')
+        }
+
+        const chargeResult = await response.json()
+        console.log('Charge created:', chargeResult)
+
+        // Update the barracks item with the new payment info
+        const updateResponse = await fetch('/api/barracks/update-payment-info', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            barracksItemId: item.id,
+            paymentId: chargeResult.charge.id,
+            planId: chargeResult.charge.planId
+          })
+        })
+
+        if (!updateResponse.ok) {
+          console.error('Failed to update barracks item with payment info')
+        }
+
+        // Now open the payment modal with the new plan_id
+        if (typeof window !== 'undefined' && (window as any).Whop) {
+          const whop = (window as any).Whop
+          
+          const result = await whop.openPurchaseModal({
+            planId: chargeResult.charge.planId,
+            onSuccess: () => {
+              toast({
+                title: "Payment Successful! 🎉",
+                description: "Your payment has been processed. The item will be available shortly once verified.",
+              })
+              loadPurchasedItems()
+            },
+            onError: (error: any) => {
+              console.error('Payment error:', error)
+              toast({
+                title: "Payment Failed",
+                description: "There was an issue processing your payment. Please try again.",
+                variant: "destructive",
+              })
+            },
+            onClose: () => {
+              console.log('Payment modal closed')
+            }
+          })
+        } else {
+          // Fallback: redirect to Whop purchase page
+          const purchaseUrl = `https://whop.com/checkout/${chargeResult.charge.planId}`
+          window.open(purchaseUrl, '_blank')
+          
+          toast({
+            title: "Opening Payment Page",
+            description: "Redirecting to payment page in a new tab.",
+          })
+        }
+      } else if (item.plan_id) {
+        // Existing plan_id exists, use it directly
+        if (typeof window !== 'undefined' && (window as any).Whop) {
+          const whop = (window as any).Whop
+          
+          const result = await whop.openPurchaseModal({
+            planId: item.plan_id,
+            onSuccess: () => {
+              toast({
+                title: "Payment Successful! 🎉",
+                description: "Your payment has been processed. The item will be available shortly once verified.",
+              })
+              loadPurchasedItems()
+            },
+            onError: (error: any) => {
+              console.error('Payment error:', error)
+              toast({
+                title: "Payment Failed",
+                description: "There was an issue processing your payment. Please try again.",
+                variant: "destructive",
+              })
+            },
+            onClose: () => {
+              console.log('Payment modal closed')
+            }
+          })
+        } else {
+          // Fallback: redirect to Whop purchase page
+          const purchaseUrl = `https://whop.com/checkout/${item.plan_id}`
+          window.open(purchaseUrl, '_blank')
+          
+          toast({
+            title: "Opening Payment Page",
+            description: "Redirecting to payment page in a new tab.",
+          })
+        }
       } else {
-        // Fallback: redirect to Whop purchase page
-        const purchaseUrl = `https://whop.com/checkout/${item.plan_id}`
-        window.open(purchaseUrl, '_blank')
-        
-        toast({
-          title: "Opening Payment Page",
-          description: "Redirecting to payment page in a new tab.",
-        })
+        throw new Error('No plan_id available and not an auction win')
       }
     } catch (error) {
       console.error('Error retrying payment:', error)
