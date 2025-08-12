@@ -254,7 +254,9 @@ export default function BarracksPage() {
 
   const handleUpdateShippingAddress = async (itemId: string, shippingAddress: any) => {
     try {
-      console.log('Updating shipping address for item:', itemId, shippingAddress)
+      console.log('=== handleUpdateShippingAddress called ===')
+      console.log('Item ID:', itemId)
+      console.log('Shipping Address:', shippingAddress)
       console.log('Item ID type:', typeof itemId, 'Value:', itemId)
       
       // If shippingAddress is null, we're clearing the address to allow re-entry
@@ -276,6 +278,9 @@ export default function BarracksPage() {
         console.error('Supabase error:', error)
         throw error
       }
+
+      console.log('✅ Supabase update successful!')
+      console.log('Updated data:', data)
 
       // Update local state immediately for better UX
       setPurchasedItems(prev => {
@@ -655,7 +660,9 @@ function ShippingAddressForm({ onSubmit }: { onSubmit: (address: any) => void })
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     console.log('ShippingAddressForm submitting address:', address)
+    console.log('Form submitted, calling onSubmit...')
     onSubmit(address)
+    console.log('onSubmit called successfully')
   }
 
   return (
