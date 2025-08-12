@@ -113,6 +113,13 @@ export default function BarracksPage() {
         const newUserNames = userNameResults.reduce((acc, result) => ({ ...acc, ...result }), {})
         setUserNames(newUserNames)
 
+        console.log('Raw barracks items from database:', barracksItems.map(item => ({
+          id: item.id,
+          auction_id: item.auction_id,
+          title: item.title,
+          type: item.auction_type
+        })))
+        
         setPurchasedItems(barracksItems.map(item => ({
           id: item.id || item.auction_id, // Use barracks item ID if available, fallback to auction_id
           auction_id: item.auction_id,
@@ -220,16 +227,22 @@ export default function BarracksPage() {
   const handleUpdateShippingAddress = async (itemId: string, shippingAddress: any) => {
     try {
       console.log('Updating shipping address for item:', itemId, shippingAddress)
+      console.log('Item ID type:', typeof itemId, 'Value:', itemId)
       
       // If shippingAddress is null, we're clearing the address to allow re-entry
       const updateData = shippingAddress === null 
         ? { shipping_address: null, updated_at: new Date().toISOString() }
         : { shipping_address: shippingAddress, updated_at: new Date().toISOString() }
       
-      const { error } = await supabaseClient
+      console.log('Update data being sent to Supabase:', updateData)
+      
+      const { data, error } = await supabaseClient
         .from('barracks_items')
         .update(updateData)
         .eq('id', itemId)
+        .select()
+
+      console.log('Supabase response:', { data, error })
 
       if (error) {
         console.error('Supabase error:', error)
@@ -273,17 +286,31 @@ export default function BarracksPage() {
       if (needsCharge && item.auction_id) {
         console.log('Creating charge for won auction:', item.auction_id)
         
+        // Calculate total amount including shipping for physical items
+        let totalAmount = item.amount_cents
+        let shippingCost = 0
+        
+        if (item.type === 'PHYSICAL') {
+          // Add shipping cost for physical items (e.g., $5.00 shipping)
+          shippingCost = 500 // $5.00 in cents
+          totalAmount += shippingCost
+          console.log('Adding shipping cost for physical item:', { original: item.amount_cents, shipping: shippingCost, total: totalAmount })
+        }
+        
         const response = await fetch('/api/charge', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: context.userId,
             experienceId: context.experienceId,
-            amount: item.amount_cents,
+            amount: totalAmount,
             currency: 'usd',
             metadata: {
               auctionId: item.auction_id,
-              type: 'auction_win'
+              type: 'auction_win',
+              originalAmount: item.amount_cents,
+              shippingCost: shippingCost,
+              itemType: item.type
             }
           })
         })
@@ -590,6 +617,7 @@ function ShippingAddressForm({ onSubmit }: { onSubmit: (address: any) => void })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('ShippingAddressForm submitting address:', address)
     onSubmit(address)
   }
 
@@ -755,13 +783,25 @@ function PurchasedItemCard({
           )}
 
           {/* Pending Payment Notice */}
-          {item.type === 'DIGITAL' && item.status === 'PENDING_PAYMENT' && (
+          {item.status === 'PENDING_PAYMENT' && (
             <div className="space-y-3">
               <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-yellow-600" />
-                  <p className="text-sm text-yellow-800">Payment pending. Digital content will be available once payment is confirmed.</p>
+                  <p className="text-sm text-yellow-800">
+                    {item.type === 'DIGITAL' 
+                      ? 'Payment pending. Digital content will be available once payment is confirmed.'
+                      : 'Payment pending. Physical item will be shipped once payment is confirmed.'
+                    }
+                  </p>
                 </div>
+                {item.type === 'PHYSICAL' && (
+                  <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+                    <p className="text-xs text-blue-800">
+                      <strong>Shipping Cost:</strong> $5.00 will be added to your payment
+                    </p>
+                  </div>
+                )}
               </div>
               
               {/* Pay Now Button */}

@@ -79,6 +79,8 @@ export default function SellerPage({ params }: { params: { experienceId: string 
       }
 
       if (items) {
+        console.log('Raw items from database:', items)
+        
         // Fetch buyer names for all items
         const uniqueBuyerIds = Array.from(new Set(items.map(item => item.user_id).filter(Boolean)))
         const buyerNamePromises = uniqueBuyerIds.map(async (buyerId) => {
@@ -89,7 +91,7 @@ export default function SellerPage({ params }: { params: { experienceId: string 
         const buyerNameResults = await Promise.all(buyerNamePromises)
         const buyerNames = buyerNameResults.reduce((acc, result) => ({ ...acc, ...result }), {})
 
-        setSoldItems(items.map(item => ({
+        const mappedItems = items.map(item => ({
           id: item.id || item.auction_id,
           auction_id: item.auction_id,
           title: item.title,
@@ -109,7 +111,16 @@ export default function SellerPage({ params }: { params: { experienceId: string 
           seller_amount: item.seller_payout_amount,
           community_amount: item.community_payout_amount,
           platform_fee: item.platform_fee_amount
+        }))
+        
+        console.log('Mapped items with shipping addresses:', mappedItems.map(item => ({
+          id: item.id,
+          title: item.title,
+          type: item.type,
+          shipping_address: item.shipping_address
         })))
+        
+        setSoldItems(mappedItems)
       }
     } catch (error) {
       console.error('Error loading sold items:', error)
