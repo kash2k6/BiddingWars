@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { getWhopContext } from "@/lib/whop-context"
+import { getIframeContext, createInAppPurchase } from "@/lib/whop-client"
 import { AuctionCard } from "@/components/AuctionCard"
 import { LiveFeed } from "@/components/LiveFeed"
 import { Button } from "@/components/ui/button"
@@ -221,29 +222,63 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
 
   const handleBuyNow = async (auctionId: string) => {
     try {
-      const response = await fetch(`/api/auctions/${auctionId}/finalize`, {
+      // Find the auction to get the buy now price
+      const auction = auctions.find(a => a.id === auctionId)
+      if (!auction || !auction.buy_now_price_cents) {
+        throw new Error('Buy now not available for this auction')
+      }
+
+      // First, process the payment
+      const context = await getIframeContext()
+      
+      // Create charge for buy now purchase
+      const chargeResponse = await fetch("/api/charge", {
+        method: "POST",
+        body: JSON.stringify({ 
+          userId: context.userId, 
+          experienceId: context.experienceId,
+          amount: auction.buy_now_price_cents,
+          currency: 'usd',
+          metadata: {
+            auctionId: auction.id,
+            type: 'buy_now_purchase'
+          }
+        }),
+      })
+      
+      if (!chargeResponse.ok) {
+        throw new Error("Failed to create charge")
+      }
+      
+      const inAppPurchase = await chargeResponse.json()
+      
+      // Process the payment
+      const res = await createInAppPurchase(inAppPurchase.id || 'mock-purchase-id')
+      
+      if (!res.success) {
+        throw new Error('Payment failed')
+      }
+
+      // Now finalize the auction
+      const finalizeResponse = await fetch(`/api/auctions/${auctionId}/finalize`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-whop-user-token': currentUserId || '',
-          'x-whop-experience-id': params.experienceId,
         },
         body: JSON.stringify({
           userId: currentUserId,
           experienceId: params.experienceId,
-          companyId: currentCompanyId
+          companyId: currentCompanyId,
+          buyNow: true,
+          amount: auction.buy_now_price_cents
         })
       })
 
-      const result = await response.json()
+      const result = await finalizeResponse.json()
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to buy now')
+      if (!finalizeResponse.ok) {
+        throw new Error(result.error || 'Failed to finalize purchase')
       }
-
-      // Open Whop payment modal
-      const { createInAppPurchase } = await import("@/lib/whop-iframe")
-      await createInAppPurchase(result.inAppPurchase.planId)
       
       toast({
         title: "Purchase Complete!",
