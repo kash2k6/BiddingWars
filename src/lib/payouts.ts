@@ -1,4 +1,4 @@
-import { whopSdk } from './whop-sdk';
+import { whopSdk } from '@/lib/whop';
 
 export interface PayoutCalculation {
   totalAmount: number;
@@ -153,4 +153,14 @@ export async function executePayouts(payoutRequest: PayoutRequest): Promise<{
  */
 export function getPayoutBreakdown(totalAmount: number): PayoutCalculation {
   return calculatePayoutDistribution(totalAmount);
+}
+
+/**
+ * Format currency amount (in cents) to display string
+ */
+export function formatCurrency(amountCents: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD'
+  }).format(amountCents / 100);
 }

@@ -22,6 +22,7 @@ interface PurchasedItem {
   plan_id: string
   paid_at: string
   amount_cents: number
+  seller_id?: string
   digital_product?: {
     delivery_type: 'FILE' | 'DOWNLOAD_LINK' | 'DISCOUNT_CODE'
     file_url?: string
@@ -122,6 +123,7 @@ export default function BarracksPage() {
           plan_id: item.plan_id,
           paid_at: item.paid_at,
           amount_cents: item.amount_cents,
+          seller_id: item.seller_id,
           digital_product: item.digital_delivery_type ? {
             delivery_type: item.digital_delivery_type,
             file_url: item.digital_file_path,
@@ -689,8 +691,8 @@ function PurchasedItemCard({
             </div>
           )}
 
-          {/* Payout Breakdown for Auction Items */}
-          {item.auction_id && item.status === 'PAID' && (
+          {/* Payout Breakdown for Auction Items - Only show to seller */}
+          {item.auction_id && item.status === 'PAID' && context?.userId === item.seller_id && (
             <PayoutBreakdown 
               totalAmount={item.amount_cents / 100} 
               showDetails={true}
