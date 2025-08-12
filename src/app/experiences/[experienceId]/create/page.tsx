@@ -35,6 +35,22 @@ interface CreateListingForm {
   digitalProduct?: DigitalProductData
 }
 
+// Utility function to get local time in the format expected by datetime-local input
+const getLocalDateTimeString = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+// Utility function to convert local datetime string to UTC ISO string
+const localToUTC = (localDateTimeString: string): string => {
+  const localDate = new Date(localDateTimeString)
+  return localDate.toISOString()
+}
+
 export default function CreateListingPage({ params }: { params: { experienceId: string } }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -42,6 +58,12 @@ export default function CreateListingPage({ params }: { params: { experienceId: 
   const [loading, setLoading] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editingAuctionId, setEditingAuctionId] = useState<string | null>(null)
+  
+  // Initialize with local time
+  const now = new Date()
+  const defaultStartTime = getLocalDateTimeString(now)
+  const defaultEndTime = getLocalDateTimeString(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)) // 7 days from now
+  
   const [form, setForm] = useState<CreateListingForm>({
     title: '',
     description: '',
@@ -51,8 +73,8 @@ export default function CreateListingPage({ params }: { params: { experienceId: 
     buyNowPriceCents: undefined,
     communityPct: 5, // 5% default
     shippingCostCents: 0,
-    startsAt: new Date().toISOString().slice(0, 16), // Start immediately
-    endsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16), // 7 days from now
+    startsAt: defaultStartTime, // Use local time
+    endsAt: defaultEndTime, // Use local time
     images: [],
     digitalProduct: {
       deliveryType: 'FILE',
@@ -85,17 +107,22 @@ export default function CreateListingPage({ params }: { params: { experienceId: 
                   const endpoint = isEditing ? `/api/auctions/${editingAuctionId}` : '/api/auctions'
                   const method = isEditing ? 'PUT' : 'POST'
 
+                  // Convert local times to UTC before sending to server
+                  const formData = {
+                    ...form,
+                    startsAt: localToUTC(form.startsAt),
+                    endsAt: localToUTC(form.endsAt),
+                    userId: context.userId,
+                    experienceId: context.experienceId,
+                    companyId: context.companyId,
+                  }
+
                   const response = await fetch(endpoint, {
                     method,
                     headers: {
                       'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                      ...form,
-                      userId: context.userId,
-                      experienceId: context.experienceId,
-                      companyId: context.companyId,
-                    }),
+                    body: JSON.stringify(formData),
                   })
 
                   const result = await response.json()
@@ -171,8 +198,8 @@ export default function CreateListingPage({ params }: { params: { experienceId: 
                     buyNowPriceCents: auction.buy_now_price_cents,
                     communityPct: auction.community_pct,
                     shippingCostCents: auction.shipping_cost_cents,
-                    startsAt: new Date(auction.starts_at).toISOString().slice(0, 16),
-                    endsAt: new Date(auction.ends_at).toISOString().slice(0, 16),
+                    startsAt: getLocalDateTimeString(new Date(auction.starts_at)),
+                    endsAt: getLocalDateTimeString(new Date(auction.ends_at)),
                     images: auction.images || [],
                     digitalProduct: {
                       deliveryType: auction.digital_delivery_type || 'FILE',
@@ -380,24 +407,7 @@ export default function CreateListingPage({ params }: { params: { experienceId: 
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Current Time Display */}
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-blue-600" />
-                    <div>
-                      <p className="text-sm font-medium text-blue-800">🕐 Current Time</p>
-                      <p className="text-xs text-blue-700 mt-1">
-                        Your local time: <span className="font-mono font-bold">{new Date().toLocaleString()}</span>
-                      </p>
-                      <p className="text-xs text-blue-700">
-                        Timezone: <span className="font-mono">{Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
-                      </p>
-                      <p className="text-xs text-blue-700 mt-1">
-                        <strong>Note:</strong> All times are stored in UTC. Your browser will convert them to your local timezone.
-                      </p>
-                    </div>
-                  </div>
-                </div>
+
                 <div>
                   <label className="block text-sm font-medium mb-2">Start Time</label>
                   <input
