@@ -62,39 +62,76 @@ export async function getIframeContext() {
 // Function to create in-app purchase
 export async function createInAppPurchase(inAppPurchase: any) {
   try {
-    console.log('Processing payment for charge:', inAppPurchase)
+    console.log('Opening payment modal for:', inAppPurchase)
+    console.log('Iframe SDK available:', !!iframeSdk)
+    console.log('Iframe SDK methods:', Object.keys(iframeSdk))
     
-    // Since iframe SDK is not working reliably, use direct payment URL approach
-    const paymentUrl = `https://whop.com/checkout/${inAppPurchase.id}`
-    console.log('Opening payment URL:', paymentUrl)
-    
+    // Check if we're in an iframe environment
     if (typeof window !== 'undefined') {
-      // Open payment URL in a new window/tab
-      const paymentWindow = window.open(paymentUrl, '_blank', 'width=500,height=600,scrollbars=yes,resizable=yes')
-      
-      if (!paymentWindow) {
-        throw new Error('Failed to open payment window. Please allow popups and try again.')
-      }
-      
-      console.log('Payment window opened successfully')
-      
+      console.log('Window parent check:', window.parent === window ? 'Same window' : 'Different window')
+    }
+    
+    // Use the iframe SDK to open the payment modal as per Whop documentation
+    const result = await iframeSdk.inAppPurchase(inAppPurchase)
+    
+    console.log('Payment modal result:', result)
+    
+    if (result.status === "ok") {
       return {
         success: true,
-        chargeId: inAppPurchase.id,
-        sessionId: inAppPurchase.id,
-        receiptId: inAppPurchase.id,
-        paymentUrl: paymentUrl,
-        paymentWindow: paymentWindow
+        receiptId: result.data.receipt_id,
+        sessionId: result.data.session_id || inAppPurchase.id,
+        chargeId: inAppPurchase.id
       }
     } else {
-      throw new Error('Not in browser environment')
+      return {
+        success: false,
+        error: result.error || 'Payment failed',
+        chargeId: inAppPurchase.id,
+        sessionId: null,
+        receiptId: null
+      }
     }
   } catch (error) {
-    console.error('Failed to open payment:', error)
+    console.error('Failed to open payment modal:', error)
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      inAppPurchase: inAppPurchase
+    })
+    
+    // Fallback: try to open the payment URL directly if iframe SDK fails
+    console.log('Trying fallback: opening payment URL directly')
+    try {
+      const paymentUrl = `https://whop.com/checkout/${inAppPurchase.id}`
+      console.log('Opening payment URL:', paymentUrl)
+      
+      if (typeof window !== 'undefined') {
+        const paymentWindow = window.open(paymentUrl, '_blank', 'width=500,height=600,scrollbars=yes,resizable=yes')
+        
+        if (!paymentWindow) {
+          throw new Error('Failed to open payment window. Please allow popups and try again.')
+        }
+        
+        console.log('Payment window opened successfully (fallback)')
+        
+        return {
+          success: true,
+          chargeId: inAppPurchase.id,
+          sessionId: inAppPurchase.id,
+          receiptId: inAppPurchase.id,
+          paymentUrl: paymentUrl,
+          paymentWindow: paymentWindow,
+          fallback: true
+        }
+      }
+    } catch (fallbackError) {
+      console.error('Fallback also failed:', fallbackError)
+    }
     
     return {
       success: false,
-      error: `Failed to open payment: ${error.message}`,
+      error: `Failed to open payment modal: ${error.message}`,
       chargeId: inAppPurchase?.id,
       sessionId: null,
       receiptId: null
