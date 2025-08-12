@@ -50,6 +50,11 @@ export function ExcitingBidButton({
     }, 2000)
   }
 
+  // Add error sound method for when bids fail
+  const playErrorSound = async () => {
+    await SoundManager.playError()
+  }
+
   const getButtonStyle = () => {
     if (isWinning) {
       return 'bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black shadow-lg shadow-yellow-500/50'

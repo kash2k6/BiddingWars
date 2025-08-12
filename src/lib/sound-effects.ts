@@ -6,9 +6,10 @@ export class SoundManager {
     const soundFiles = {
       'bid-explosion': '/sounds/BidClick.wav',
       'page-entrance': '/sounds/Moredetailspageload.wav',
-      'auction-won': '/sounds/victory-fanfare.mp3',
-      'outbid': '/sounds/alert-warning.mp3',
-      'button-click': '/sounds/button-click.mp3'
+      'auction-won': '/sounds/bidwinner.wav',
+      'auction-ending': '/sounds/10seccountdownbid ending.wav',
+      'error': '/sounds/error.wav',
+      'outbid': '/sounds/error.wav' // Using error sound for outbid alerts
     }
 
     for (const [name, path] of Object.entries(soundFiles)) {
@@ -54,6 +55,14 @@ export class SoundManager {
 
   static async playButtonClick() {
     await this.playSound('button-click', 0.3)
+  }
+
+  static async playAuctionEnding() {
+    await this.playSound('auction-ending', 0.6)
+  }
+
+  static async playError() {
+    await this.playSound('error', 0.4)
   }
 }
 

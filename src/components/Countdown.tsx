@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Clock, Zap, Flame, Target, AlertTriangle } from "lucide-react"
+import { SoundManager } from "@/lib/sound-effects"
 
 interface CountdownProps {
   endTime: string
@@ -30,6 +31,8 @@ export function Countdown({ endTime, onEnd, className, variant = 'default' }: Co
       if (difference <= 0) {
         setIsEnded(true)
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+        // Play auction ending sound
+        SoundManager.playAuctionEnding()
         onEnd?.()
         clearInterval(timer)
       } else {

@@ -202,6 +202,11 @@ export default function AuctionDetailPage() {
         (payload) => {
           const updatedAuction = payload.new as Auction
           setAuction(updatedAuction)
+          
+          // Play victory sound if auction is won by current user
+          if (updatedAuction.status === 'PAID' && updatedAuction.winner_user_id === currentUserId) {
+            SoundManager.playAuctionWon()
+          }
         }
       )
       .subscribe()
