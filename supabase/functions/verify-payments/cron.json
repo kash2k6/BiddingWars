@@ -1,0 +1,4 @@
+{
+  "cron": "*/2 * * * *",
+  "function": "verify-payments"
+}

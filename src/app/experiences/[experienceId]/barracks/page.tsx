@@ -3,13 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { getIframeContext } from '@/lib/whop-iframe'
-import { createClient } from '@/lib/supabase-client'
+import { supabaseClient } from '@/lib/supabase-client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Download, Package, CheckCircle, AlertCircle, Shield, Medal, Trophy } from 'lucide-react'
-import { toast } from '@/hooks/use-toast'
+import { useToast } from '@/hooks/use-toast'
 
 interface PurchasedItem {
   id: string
@@ -19,14 +19,16 @@ interface PurchasedItem {
   status: string
   plan_id: string
   paid_at: string
+  amount_cents: number
   digital_product?: {
     delivery_type: 'FILE' | 'DOWNLOAD_LINK' | 'DISCOUNT_CODE'
     file_url?: string
     download_link?: string
     discount_code?: string
   }
-  shipping_address?: string
-  tracking_link?: string
+  shipping_address?: any
+  tracking_number?: string
+  shipping_carrier?: string
   seller_info?: {
     username: string
     email: string
@@ -38,6 +40,7 @@ export default function BarracksPage() {
   const [purchasedItems, setPurchasedItems] = useState<PurchasedItem[]>([])
   const [loading, setLoading] = useState(true)
   const [context, setContext] = useState<any>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     const loadPurchasedItems = async () => {
@@ -45,32 +48,45 @@ export default function BarracksPage() {
         const iframeContext = await getIframeContext()
         setContext(iframeContext)
         
-        // Get all auctions won by this user
-        const supabase = createClient()
-        const { data: auctions, error } = await supabase
-          .from('auctions')
-          .select(`
-            *,
-            seller:created_by_user_id(username, email)
-          `)
-          .eq('winner_user_id', iframeContext.userId)
-          .eq('status', 'PAID')
+        // Get all items in user's barracks using the view
+        const { data: barracksItems, error } = await supabaseClient
+          .from('v_barracks_items')
+          .select('*')
+          .eq('user_id', iframeContext.userId)
           .order('paid_at', { ascending: false })
 
         if (error) {
-          console.error('Error fetching purchased items:', error)
+          console.error('Error fetching barracks items:', error)
           toast({
             title: "Error",
-            description: "Failed to load your purchased items",
+            description: "Failed to load your barracks items",
             variant: "destructive",
           })
           return
         }
 
-        if (auctions) {
-          setPurchasedItems(auctions.map(auction => ({
-            ...auction,
-            seller_info: auction.seller
+        if (barracksItems) {
+          setPurchasedItems(barracksItems.map(item => ({
+            id: item.auction_id,
+            title: item.title,
+            description: item.description,
+            type: item.auction_type,
+            status: item.barracks_status,
+            plan_id: item.plan_id,
+            paid_at: item.paid_at,
+            amount_cents: item.amount_cents,
+            digital_product: item.digital_delivery_type ? {
+              delivery_type: item.digital_delivery_type,
+              file_url: item.digital_file_path,
+              download_link: item.digital_download_link,
+              discount_code: item.digital_discount_code
+            } : undefined,
+            shipping_address: item.shipping_address,
+            tracking_link: item.tracking_number ? `https://tracking.example.com/${item.tracking_number}` : undefined,
+            seller_info: {
+              username: item.seller_id,
+              email: `${item.seller_id}@example.com`
+            }
           })))
         }
       } catch (error) {
@@ -119,11 +135,12 @@ export default function BarracksPage() {
 
   const handleMarkAsReceived = async (itemId: string) => {
     try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from('auctions')
-        .update({ status: 'FULFILLED' })
-        .eq('id', itemId)
+      // Use the function to mark item as fulfilled
+      const { data, error } = await supabaseClient
+        .rpc('mark_barracks_item_fulfilled', {
+          item_id: itemId,
+          user_id_param: context.userId
+        })
 
       if (error) {
         throw error
@@ -142,6 +159,37 @@ export default function BarracksPage() {
       toast({
         title: "Error",
         description: "Failed to mark item as received",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleUpdateShippingAddress = async (itemId: string, shippingAddress: any) => {
+    try {
+      const { error } = await supabaseClient
+        .from('fulfillments')
+        .upsert({
+          auction_id: itemId,
+          shipping_address: shippingAddress
+        })
+
+      if (error) {
+        throw error
+      }
+
+      setPurchasedItems(prev => prev.map(item => 
+        item.id === itemId ? { ...item, shipping_address: shippingAddress } : item
+      ))
+      
+      toast({
+        title: "Success!",
+        description: "Shipping address updated",
+      })
+    } catch (error) {
+      console.error('Error updating shipping address:', error)
+      toast({
+        title: "Error",
+        description: "Failed to update shipping address",
         variant: "destructive",
       })
     }
@@ -225,6 +273,7 @@ export default function BarracksPage() {
                   item={item} 
                   onDownload={handleDownload}
                   onMarkReceived={handleMarkAsReceived}
+                  onUpdateShippingAddress={handleUpdateShippingAddress}
                 />
               ))}
             </div>
@@ -240,6 +289,7 @@ export default function BarracksPage() {
                     item={item} 
                     onDownload={handleDownload}
                     onMarkReceived={handleMarkAsReceived}
+                    onUpdateShippingAddress={handleUpdateShippingAddress}
                   />
                 ))}
             </div>
@@ -255,6 +305,7 @@ export default function BarracksPage() {
                     item={item} 
                     onDownload={handleDownload}
                     onMarkReceived={handleMarkAsReceived}
+                    onUpdateShippingAddress={handleUpdateShippingAddress}
                   />
                 ))}
             </div>
@@ -270,6 +321,7 @@ export default function BarracksPage() {
                     item={item} 
                     onDownload={handleDownload}
                     onMarkReceived={handleMarkAsReceived}
+                    onUpdateShippingAddress={handleUpdateShippingAddress}
                   />
                 ))}
             </div>
@@ -296,14 +348,93 @@ export default function BarracksPage() {
   )
 }
 
+function ShippingAddressForm({ onSubmit }: { onSubmit: (address: any) => void }) {
+  const [address, setAddress] = useState({
+    name: '',
+    street: '',
+    city: '',
+    state: '',
+    zip: '',
+    country: 'US'
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSubmit(address)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-2">
+      <input
+        type="text"
+        placeholder="Full Name"
+        value={address.name}
+        onChange={(e) => setAddress(prev => ({ ...prev, name: e.target.value }))}
+        className="w-full p-2 border rounded-md text-sm"
+        required
+      />
+      <input
+        type="text"
+        placeholder="Street Address"
+        value={address.street}
+        onChange={(e) => setAddress(prev => ({ ...prev, street: e.target.value }))}
+        className="w-full p-2 border rounded-md text-sm"
+        required
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          type="text"
+          placeholder="City"
+          value={address.city}
+          onChange={(e) => setAddress(prev => ({ ...prev, city: e.target.value }))}
+          className="w-full p-2 border rounded-md text-sm"
+          required
+        />
+        <input
+          type="text"
+          placeholder="State"
+          value={address.state}
+          onChange={(e) => setAddress(prev => ({ ...prev, state: e.target.value }))}
+          className="w-full p-2 border rounded-md text-sm"
+          required
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          type="text"
+          placeholder="ZIP Code"
+          value={address.zip}
+          onChange={(e) => setAddress(prev => ({ ...prev, zip: e.target.value }))}
+          className="w-full p-2 border rounded-md text-sm"
+          required
+        />
+        <select
+          value={address.country}
+          onChange={(e) => setAddress(prev => ({ ...prev, country: e.target.value }))}
+          className="w-full p-2 border rounded-md text-sm"
+        >
+          <option value="US">United States</option>
+          <option value="CA">Canada</option>
+          <option value="UK">United Kingdom</option>
+        </select>
+      </div>
+      <Button type="submit" className="w-full">
+        Save Shipping Address
+      </Button>
+    </form>
+  )
+}
+
 function PurchasedItemCard({ 
   item, 
   onDownload, 
-  onMarkReceived 
+  onMarkReceived,
+  onUpdateShippingAddress
 }: { 
   item: PurchasedItem
   onDownload: (item: PurchasedItem) => void
   onMarkReceived: (itemId: string) => void
+  onUpdateShippingAddress: (itemId: string, shippingAddress: any) => void
 }) {
   return (
     <Card className="hover:shadow-lg transition-shadow">
@@ -376,21 +507,25 @@ function PurchasedItemCard({
             <div className="space-y-2">
               <h4 className="font-semibold">Physical Product</h4>
               
-              {item.shipping_address && (
+              {!item.shipping_address ? (
+                <ShippingAddressForm 
+                  onSubmit={(address) => onUpdateShippingAddress(item.id, address)}
+                />
+              ) : (
                 <div className="p-3 bg-gray-100 rounded-md">
                   <p className="text-sm text-gray-600">Shipping Address:</p>
-                  <p className="text-sm">{item.shipping_address}</p>
+                  <p className="text-sm">{JSON.stringify(item.shipping_address)}</p>
                 </div>
               )}
               
-              {item.tracking_link && (
+              {item.tracking_number && (
                 <a 
-                  href={item.tracking_link} 
+                  href={`https://tracking.example.com/${item.tracking_number}`}
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="block p-3 bg-gray-100 rounded-md text-blue-600 hover:bg-gray-200 transition-colors text-center"
                 >
-                  Track Package
+                  Track Package ({item.shipping_carrier})
                 </a>
               )}
               

@@ -27,6 +27,8 @@ export async function POST(request: NextRequest) {
       amount: amountInDollars,
       currency: currency,
       userId: actualUserId,
+      // Add redirect URL to barracks for post-payment
+      redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://localhost:3000'}/experiences/${experienceId}/barracks`,
       // metadata is information that you'd like to receive later about the payment.
       metadata: {
         experienceId: experienceId,

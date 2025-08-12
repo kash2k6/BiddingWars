@@ -270,34 +270,50 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
         })
       }
 
-      // Now finalize the auction
-      const finalizeResponse = await fetch(`/api/auctions/${auctionId}/finalize`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: currentUserId,
-          experienceId: params.experienceId,
-          companyId: currentCompanyId,
-          buyNow: true,
-          amount: auction.buy_now_price_cents
+              // Add item to barracks
+        const addToBarracksResponse = await fetch('/api/barracks/add-item', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            auctionId: auctionId,
+            userId: currentUserId,
+            planId: chargeResult.charge.planId,
+            amountCents: auction.buy_now_price_cents,
+            status: 'PENDING_PAYMENT'
+          })
         })
-      })
 
-      const result = await finalizeResponse.json()
+        if (!addToBarracksResponse.ok) {
+          console.error('Failed to add item to barracks')
+        }
 
-      if (!finalizeResponse.ok) {
-        throw new Error(result.error || 'Failed to finalize purchase')
-      }
-      
-      toast({
-        title: "Purchase Complete!",
-        description: "You have successfully purchased this item.",
-      })
+        // Remove auction from marketplace
+        const removeResponse = await fetch(`/api/auctions/${auctionId}/remove`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: currentUserId,
+            experienceId: params.experienceId
+          })
+        })
 
-      // Refresh the page to update the UI
-      window.location.reload()
+        if (!removeResponse.ok) {
+          console.error('Failed to remove auction from marketplace')
+        }
+
+        toast({
+          title: "Payment Window Opened",
+          description: "Please complete your payment. You'll be redirected to your barracks to claim your item.",
+        })
+
+        // Redirect to barracks after a short delay
+        setTimeout(() => {
+          window.location.href = `/experiences/${params.experienceId}/barracks`
+        }, 2000)
     } catch (error) {
       console.error('Error buying now:', error)
       toast({

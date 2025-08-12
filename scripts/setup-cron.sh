@@ -1,35 +1,39 @@
 #!/bin/bash
 
-echo "🚀 Setting up BiddingWars Cron Job"
-echo "=================================="
+# Bidding Wars - Cron Job Setup Script
+# This script helps you set up the cron jobs for payment verification
 
-# Supabase Edge Function URL
-EDGE_FUNCTION_URL="https://fdvzkpucafqkguglqgpu.supabase.co/functions/v1/finalize-auctions"
+echo "🚀 Setting up Bidding Wars Cron Jobs..."
 
-# Service role key (you'll need to add this)
-SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkdnprcHVjYWZxa2d1Z2xxZ3B1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDkwNTEzNiwiZXhwIjoyMDcwNDgxMTM2fQ.A1H-VUcNlagHFMgr0m_7a4Dg7kBq8FoGYfsrUh8NeVk"
-
-echo "✅ Supabase Edge Function URL: $EDGE_FUNCTION_URL"
-echo ""
-
-echo "🧪 Testing Edge Function..."
-curl -X POST "$EDGE_FUNCTION_URL" \
-  -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
-  -H "Content-Type: application/json" \
-  -s | jq .
+# Check if CRON_SECRET_KEY is set
+if [ -z "$CRON_SECRET_KEY" ]; then
+    echo "⚠️  Warning: CRON_SECRET_KEY environment variable is not set"
+    echo "   Please set it in your environment or .env file"
+    echo "   You can generate one with: openssl rand -base64 32"
+fi
 
 echo ""
-echo "📋 Next Steps:"
-echo "1. Go to https://cron-job.org"
-echo "2. Create a new cron job"
-echo "3. Set URL to: $EDGE_FUNCTION_URL"
-echo "4. Set method to: POST"
-echo "5. Add header: Authorization: Bearer $SERVICE_ROLE_KEY"
-echo "6. Set schedule to: Every 5 minutes"
-echo "7. Save and activate"
-
+echo "📋 Cron Jobs to Set Up:"
 echo ""
-echo "🔍 Monitor the cron job:"
-echo "- Supabase Dashboard: https://supabase.com/dashboard/project/fdvzkpucafqkguglqgpu/functions"
-echo "- Check function logs for execution details"
-echo "- Monitor auction status changes in your app"
+echo "1. Finalize Auctions (every 5 minutes):"
+echo "   */5 * * * * curl -X POST https://your-domain.com/api/cron/finalize-auctions \\"
+echo "   -H 'Authorization: Bearer $CRON_SECRET_KEY'"
+echo ""
+echo "2. Verify Payments (every 2 minutes):"
+echo "   */2 * * * * curl -X POST https://your-domain.com/api/cron/verify-payments \\"
+echo "   -H 'Authorization: Bearer $CRON_SECRET_KEY'"
+echo ""
+echo "🔧 Setup Instructions:"
+echo "1. Replace 'your-domain.com' with your actual domain"
+echo "2. Set CRON_SECRET_KEY in your environment"
+echo "3. Add these cron jobs to your server's crontab"
+echo "4. Test the endpoints manually first"
+echo ""
+echo "🧪 Test Commands:"
+echo "curl -X POST https://your-domain.com/api/cron/finalize-auctions \\"
+echo "  -H 'Authorization: Bearer $CRON_SECRET_KEY'"
+echo ""
+echo "curl -X POST https://your-domain.com/api/cron/verify-payments \\"
+echo "  -H 'Authorization: Bearer $CRON_SECRET_KEY'"
+echo ""
+echo "✅ Setup complete! Make sure to run the barracks-system.sql in your Supabase database first."

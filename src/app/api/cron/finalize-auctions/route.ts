@@ -147,11 +147,29 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Update auction with winner, status, and payment info
+        // Add item to winner's barracks
+        const { error: barracksError } = await supabaseServer
+          .from('barracks_items')
+          .insert({
+            auction_id: auction.id,
+            user_id: topBid.bidder_user_id,
+            plan_id: chargeResult.inAppPurchase.planId,
+            status: 'PENDING_PAYMENT',
+            amount_cents: totalAmount,
+            created_at: new Date().toISOString()
+          })
+
+        if (barracksError) {
+          console.error('Error adding item to barracks:', barracksError)
+          errors.push(`Failed to add item to barracks for auction ${auction.id}`)
+          continue
+        }
+
+        // Remove auction from marketplace (set status to REMOVED)
         const { error: updateError } = await supabaseServer
           .from('auctions')
           .update({
-            status: 'PENDING_PAYMENT',
+            status: 'REMOVED',
             winner_user_id: topBid.bidder_user_id,
             current_bid_id: topBid.id,
             payment_id: chargeResult.inAppPurchase.id,
