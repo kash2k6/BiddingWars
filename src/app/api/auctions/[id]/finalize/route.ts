@@ -18,7 +18,7 @@ export async function POST(
     console.log('Request body:', body)
     
     // Extract user context from request body
-    const { userId, experienceId, companyId } = body
+    const { userId, experienceId, companyId, buyNow, amount } = body
     
     if (!userId || !experienceId) {
       console.log('Missing userId or experienceId in request body')
@@ -55,27 +55,44 @@ export async function POST(
       return NextResponse.json({ error: 'Auction is not live' }, { status: 400 })
     }
 
-    // Get the highest bid
-    const { data: topBid, error: bidError } = await supabaseServer
-      .from('bids')
-      .select('*')
-      .eq('auction_id', params.id)
-      .order('amount_cents', { ascending: false })
-      .limit(1)
-      .single()
+    let totalAmount: number
+    let paymentDescription: string
 
-    if (bidError || !topBid) {
-      console.error('Error fetching top bid:', bidError)
-      return NextResponse.json({ error: 'No bids found for auction' }, { status: 400 })
+    if (buyNow) {
+      // Buy Now scenario
+      if (!auction.buy_now_price_cents) {
+        return NextResponse.json({ error: 'Buy Now not available for this auction' }, { status: 400 })
+      }
+      
+      if (amount !== auction.buy_now_price_cents) {
+        return NextResponse.json({ error: 'Invalid buy now amount' }, { status: 400 })
+      }
+      
+      totalAmount = amount + (auction.shipping_cost_cents || 0)
+      paymentDescription = `Buy Now purchase for auction: ${auction.title}`
+    } else {
+      // Regular auction win scenario
+      const { data: topBid, error: bidError } = await supabaseServer
+        .from('bids')
+        .select('*')
+        .eq('auction_id', params.id)
+        .order('amount_cents', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (bidError || !topBid) {
+        console.error('Error fetching top bid:', bidError)
+        return NextResponse.json({ error: 'No bids found for auction' }, { status: 400 })
+      }
+
+      // Verify the user is the highest bidder
+      if (topBid.bidder_user_id !== actualUserId) {
+        return NextResponse.json({ error: 'You are not the highest bidder' }, { status: 403 })
+      }
+
+      totalAmount = topBid.amount_cents + (auction.shipping_cost_cents || 0)
+      paymentDescription = `Payment for auction: ${auction.title}`
     }
-
-    // Verify the user is the highest bidder
-    if (topBid.bidder_user_id !== actualUserId) {
-      return NextResponse.json({ error: 'You are not the highest bidder' }, { status: 403 })
-    }
-
-    // Calculate total amount (bid + shipping)
-    const totalAmount = topBid.amount_cents + (auction.shipping_cost_cents || 0)
 
     // Calculate commission breakdown
     const breakdown = calculateCommissionBreakdown(
@@ -96,11 +113,11 @@ export async function POST(
       amount: totalAmount,
       currency: 'usd' as any,
       userId: actualUserId,
-      description: `Payment for auction: ${auction.title}`,
+      description: paymentDescription,
       metadata: {
         auctionId: params.id,
         experienceId,
-        bidId: topBid.id,
+        bidId: buyNow ? undefined : topBid.id,
         breakdown
       }
     })
@@ -112,15 +129,31 @@ export async function POST(
     }
 
     // Update auction status to PENDING_PAYMENT
+    const updateData: any = {
+      status: 'PENDING_PAYMENT',
+      winner_user_id: actualUserId,
+      payment_id: chargeResult.inAppPurchase?.id || chargeResult.inAppPurchase?.planId,
+      updated_at: new Date().toISOString()
+    }
+
+    // For regular auctions, include the bid ID
+    if (!buyNow) {
+      const { data: topBid } = await supabaseServer
+        .from('bids')
+        .select('id')
+        .eq('auction_id', params.id)
+        .order('amount_cents', { ascending: false })
+        .limit(1)
+        .single()
+      
+      if (topBid) {
+        updateData.current_bid_id = topBid.id
+      }
+    }
+
     const { error: updateError } = await supabaseServer
       .from('auctions')
-      .update({
-        status: 'PENDING_PAYMENT',
-        winner_user_id: actualUserId,
-        current_bid_id: topBid.id,
-        payment_id: chargeResult.inAppPurchase?.id || chargeResult.inAppPurchase?.planId,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', params.id)
 
     if (updateError) {
