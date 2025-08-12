@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase-client'
+import { supabaseClient } from '@/lib/supabase-client'
 
 export interface BarracksItem {
   id: string
@@ -22,7 +22,7 @@ export async function addToBarracks(
   amountCents: number,
   status: 'PENDING_PAYMENT' | 'PAID' = 'PENDING_PAYMENT'
 ) {
-  const supabase = createClient()
+  const supabase = supabaseClient
   
   const barracksItem = {
     auction_id: auctionId,
@@ -56,7 +56,7 @@ export async function updateBarracksItemStatus(
   userId: string,
   status: 'PENDING_PAYMENT' | 'PAID' | 'FULFILLED'
 ) {
-  const supabase = createClient()
+  const supabase = supabaseClient
   
   const updateData: any = {
     status: status,
@@ -89,7 +89,7 @@ export async function updateBarracksItemStatus(
  * Remove auction from marketplace once user has access
  */
 export async function removeAuctionFromMarketplace(auctionId: string) {
-  const supabase = createClient()
+  const supabase = supabaseClient
   
   const { error } = await supabase
     .from('auctions')
@@ -111,7 +111,7 @@ export async function removeAuctionFromMarketplace(auctionId: string) {
  * Get user's barracks items
  */
 export async function getUserBarracksItems(userId: string) {
-  const supabase = createClient()
+  const supabase = supabaseClient
   
   const { data, error } = await supabase
     .from('barracks_items')
@@ -134,7 +134,7 @@ export async function getUserBarracksItems(userId: string) {
  * Check if user has access to a specific plan
  */
 export async function checkUserPlanAccess(userId: string, planId: string) {
-  const supabase = createClient()
+  const supabase = supabaseClient
   
   const { data, error } = await supabase
     .from('barracks_items')
@@ -155,7 +155,7 @@ export async function checkUserPlanAccess(userId: string, planId: string) {
  * Get barracks item by plan ID (for claiming specific items)
  */
 export async function getBarracksItemByPlanId(planId: string, userId: string) {
-  const supabase = createClient()
+  const supabase = supabaseClient
   
   const { data, error } = await supabase
     .from('barracks_items')

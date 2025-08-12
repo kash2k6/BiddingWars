@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { getIframeContext } from '@/lib/whop-iframe'
-import { createClient } from '@/lib/supabase-client'
+import { supabaseClient } from '@/lib/supabase-client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Trophy, AlertTriangle, CheckCircle, DollarSign, Package, Download } from 'lucide-react'
-import { toast } from '@/hooks/use-toast'
+import { useToast } from '@/hooks/use-toast'
 import { createInAppPurchase } from '@/lib/whop-iframe'
 
 interface BarracksItem {
@@ -40,6 +40,7 @@ interface BarracksItem {
 }
 
 export default function ClaimByPlanIdPage() {
+  const { toast } = useToast()
   const params = useParams()
   const [barracksItem, setBarracksItem] = useState<BarracksItem | null>(null)
   const [loading, setLoading] = useState(true)
@@ -53,7 +54,7 @@ export default function ClaimByPlanIdPage() {
         setContext(iframeContext)
         
         // Get the barracks item by plan ID
-        const supabase = createClient()
+        const supabase = supabaseClient
         const { data: item, error } = await supabase
           .from('barracks_items')
           .select(`

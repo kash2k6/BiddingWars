@@ -23,7 +23,7 @@ export async function POST(
     console.error('Error removing auction from marketplace:', error)
     return NextResponse.json({ 
       error: 'Failed to remove auction from marketplace',
-      details: error.message 
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
 }

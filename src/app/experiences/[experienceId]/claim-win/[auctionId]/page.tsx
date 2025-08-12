@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Trophy, AlertTriangle, CheckCircle, DollarSign, Package, Download } from 'lucide-react'
-import { toast } from '@/hooks/use-toast'
+import { useToast } from '@/hooks/use-toast'
 import { createInAppPurchase } from '@/lib/whop-iframe'
 
 interface WonAuction {
@@ -37,6 +37,7 @@ interface WonAuction {
 }
 
 export default function ClaimWinPage() {
+  const { toast } = useToast()
   const params = useParams()
   const [auction, setAuction] = useState<WonAuction | null>(null)
   const [loading, setLoading] = useState(true)

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Download, Package, CheckCircle, AlertCircle } from 'lucide-react'
-import { toast } from '@/hooks/use-toast'
+import { useToast } from '@/hooks/use-toast'
 
 interface Auction {
   id: string
@@ -28,6 +28,7 @@ interface Auction {
 }
 
 export default function ClaimPage() {
+  const { toast } = useToast()
   const params = useParams()
   const [auction, setAuction] = useState<Auction | null>(null)
   const [loading, setLoading] = useState(true)
@@ -41,7 +42,7 @@ export default function ClaimPage() {
         setContext(iframeContext)
         
         // Find the auction that was won by this user
-        const supabase = createClient()
+        const supabase = supabaseClient
         const { data: auctions, error } = await supabase
           .from('auctions')
           .select('*')
