@@ -52,6 +52,7 @@ export function AuctionCard({
   const isEnded = auction.status === 'ENDED'
   const isPaid = auction.status === 'PAID'
   const isFulfilled = auction.status === 'FULFILLED'
+  const isScheduled = auction.status === 'COMING_SOON' // COMING_SOON auctions are shown as "Scheduled" to users
   const isWinner = auction.winner_user_id === currentUserId
   const isCreator = auction.created_by_user_id === currentUserId
   const isWinningBid = Boolean(currentBid && currentUserId && currentBids && Object.keys(currentBids).length > 0 && currentBid === Math.max(...Object.values(currentBids)))
@@ -137,7 +138,12 @@ export function AuctionCard({
                     {/* Countdown - Dedicated row */}
                     <div className="text-center">
                       <p className="text-xs font-medium text-orange-300 mb-1">⏰ ENDS IN</p>
-                      <Countdown endTime={auction.ends_at} />
+                      <Countdown 
+                        endTime={auction.ends_at} 
+                        startTime={auction.starts_at}
+                        playSound={false}
+                        auctionStatus={auction.status}
+                      />
                     </div>
 
                     {auction.buy_now_price_cents && (

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { whopSdk } from '@/lib/whop'
+import { supabaseServer } from '@/lib/supabase-server'
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,12 +24,13 @@ export async function POST(request: NextRequest) {
     const amountInDollars = amount / 100
     console.log('Converting amount from cents to dollars:', { cents: amount, dollars: amountInDollars })
 
-    const result = await whopSdk.payments.chargeUser({
+    // Only use redirect URL for production (not localhost)
+    const isLocalhost = process.env.NEXT_PUBLIC_APP_URL?.includes('localhost') || !process.env.NEXT_PUBLIC_APP_URL
+    
+    const chargeParams: any = {
       amount: amountInDollars,
       currency: currency,
       userId: actualUserId,
-      // Add redirect URL to barracks for post-payment
-      redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://localhost:3000'}/experiences/${experienceId}/barracks`,
       // metadata is information that you'd like to receive later about the payment.
       metadata: {
         experienceId: experienceId,
@@ -36,7 +38,14 @@ export async function POST(request: NextRequest) {
         type: metadata?.type,
         ...metadata
       },
-    })
+    }
+
+    // Only add redirect URL for production
+    if (!isLocalhost) {
+      chargeParams.redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL}/experiences/${experienceId}/barracks?payment_success=true`
+    }
+
+    const result = await whopSdk.payments.chargeUser(chargeParams)
 
     console.log('Charge result:', result)
 
@@ -44,12 +53,36 @@ export async function POST(request: NextRequest) {
       throw new Error("Failed to create charge")
     }
 
+    // Create barracks item with PENDING_PAYMENT status
+    console.log('Creating barracks item for charge:', result.inAppPurchase.id)
+    
+    const { data: barracksItem, error: barracksError } = await supabaseServer
+      .from('barracks_items')
+      .insert({
+        user_id: actualUserId,
+        auction_id: metadata?.auctionId,
+        plan_id: result.inAppPurchase.planId,
+        amount_cents: amount,
+        payment_id: result.inAppPurchase.id,
+        status: 'PENDING_PAYMENT'
+      })
+      .select()
+      .single()
+
+    if (barracksError) {
+      console.error('Error creating barracks item:', barracksError)
+      // Don't fail the entire request, but log the error
+    } else {
+      console.log('Barracks item created successfully:', barracksItem.id)
+    }
+
     // Return the charge with planId - we'll use the planId directly for checkout
     console.log('Charge created successfully with planId:', result.inAppPurchase.planId)
 
     // Return the charge object which contains the planId
     return NextResponse.json({
-      charge: result.inAppPurchase
+      charge: result.inAppPurchase,
+      barracksItem: barracksItem
     })
   } catch (error) {
     console.error("Error creating charge or checkout session:", error)

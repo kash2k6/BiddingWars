@@ -51,7 +51,7 @@ export default function ClaimWinPage() {
         setContext(iframeContext)
         
         // Get the auction details
-        const supabase = createClient()
+        const supabase = supabaseClient
         const { data: auctionData, error } = await supabase
           .from('auctions')
           .select(`

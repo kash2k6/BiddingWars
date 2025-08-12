@@ -19,6 +19,7 @@ interface Auction {
   status: string
   start_price_cents: number
   buy_now_price_cents?: number
+  starts_at: string
   ends_at: string
   winner_user_id?: string
   current_bid_id?: string
@@ -75,6 +76,7 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
             status,
             start_price_cents,
             buy_now_price_cents,
+            starts_at,
             ends_at,
             winner_user_id,
             current_bid_id,
@@ -100,6 +102,7 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
   }, [currentUserId, params.experienceId])
 
   const categorizeAuctions = () => {
+    const scheduled: Auction[] = []
     const live: Auction[] = []
     const ended: Auction[] = []
     const pendingPayment: Auction[] = []
@@ -108,6 +111,9 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
 
     auctions.forEach(auction => {
       switch (auction.status) {
+        case 'COMING_SOON':
+          scheduled.push(auction)
+          break
         case 'LIVE':
           live.push(auction)
           break
@@ -126,10 +132,10 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
       }
     })
 
-    return { live, ended, pendingPayment, paid, fulfilled }
+    return { scheduled, live, ended, pendingPayment, paid, fulfilled }
   }
 
-  const { live, ended, pendingPayment, paid, fulfilled } = categorizeAuctions()
+  const { scheduled, live, ended, pendingPayment, paid, fulfilled } = categorizeAuctions()
 
   const getCurrentBid = (auction: Auction) => {
     if (auction.bids.length === 0) return auction.start_price_cents
@@ -205,8 +211,12 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
         </Badge>
       </div>
 
-      <Tabs defaultValue="live" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+      <Tabs defaultValue="scheduled" className="w-full">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="scheduled" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Scheduled ({scheduled.length})
+          </TabsTrigger>
           <TabsTrigger value="live" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Live ({live.length})
@@ -228,6 +238,55 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
             Fulfilled ({fulfilled.length})
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="scheduled" className="space-y-4">
+          {scheduled.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-8">
+                <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No scheduled auctions</h3>
+                <p className="text-muted-foreground">
+                  You don't have any scheduled auctions.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            scheduled.map((auction) => (
+              <Card key={auction.id}>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-semibold">{auction.title}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Starting bid: {formatCurrency(auction.start_price_cents)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Starts: {new Date(auction.starts_at).toLocaleDateString()} at {new Date(auction.starts_at).toLocaleTimeString()}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Ends: {new Date(auction.ends_at).toLocaleDateString()} at {new Date(auction.ends_at).toLocaleTimeString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="default" className="bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold">
+                        <Clock className="h-3 w-3 mr-1" />
+                        SCHEDULED
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEditAuction(auction.id)}
+                        className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold"
+                      >
+                        Edit
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </TabsContent>
 
         <TabsContent value="live" className="space-y-4">
           {live.length === 0 ? (

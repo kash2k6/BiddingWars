@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { getIframeContext } from '@/lib/whop-iframe'
 import { supabaseClient } from '@/lib/supabase-client'
 import { Button } from '@/components/ui/button'
@@ -37,70 +37,84 @@ interface PurchasedItem {
 
 export default function BarracksPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const [purchasedItems, setPurchasedItems] = useState<PurchasedItem[]>([])
   const [loading, setLoading] = useState(true)
   const [context, setContext] = useState<any>(null)
   const { toast } = useToast()
 
+  // Check for payment success redirect
   useEffect(() => {
-    const loadPurchasedItems = async () => {
-      try {
-        const iframeContext = await getIframeContext()
-        setContext(iframeContext)
-        
-        // Get all items in user's barracks using the view
-        const { data: barracksItems, error } = await supabaseClient
-          .from('v_barracks_items')
-          .select('*')
-          .eq('user_id', iframeContext.userId)
-          .order('paid_at', { ascending: false })
+    const paymentSuccess = searchParams.get('payment_success')
+    const planId = searchParams.get('plan_id')
+    
+    if (paymentSuccess === 'true' && planId) {
+      toast({
+        title: "Payment Successful! 🎉",
+        description: "Your item has been added to your barracks and is now accessible.",
+      })
+    }
+  }, [searchParams, toast])
 
-        if (error) {
-          console.error('Error fetching barracks items:', error)
-          toast({
-            title: "Error",
-            description: "Failed to load your barracks items",
-            variant: "destructive",
-          })
-          return
-        }
+  const loadPurchasedItems = async () => {
+    try {
+      const iframeContext = await getIframeContext()
+      setContext(iframeContext)
+      
+      // Get all items in user's barracks using the view
+      const { data: barracksItems, error } = await supabaseClient
+        .from('v_barracks_items')
+        .select('*')
+        .eq('user_id', iframeContext.userId)
+        .order('paid_at', { ascending: false })
 
-        if (barracksItems) {
-          setPurchasedItems(barracksItems.map(item => ({
-            id: item.auction_id,
-            title: item.title,
-            description: item.description,
-            type: item.auction_type,
-            status: item.barracks_status,
-            plan_id: item.plan_id,
-            paid_at: item.paid_at,
-            amount_cents: item.amount_cents,
-            digital_product: item.digital_delivery_type ? {
-              delivery_type: item.digital_delivery_type,
-              file_url: item.digital_file_path,
-              download_link: item.digital_download_link,
-              discount_code: item.digital_discount_code
-            } : undefined,
-            shipping_address: item.shipping_address,
-            tracking_link: item.tracking_number ? `https://tracking.example.com/${item.tracking_number}` : undefined,
-            seller_info: {
-              username: item.seller_id,
-              email: `${item.seller_id}@example.com`
-            }
-          })))
-        }
-      } catch (error) {
-        console.error('Error loading purchased items:', error)
+      if (error) {
+        console.error('Error fetching barracks items:', error)
         toast({
           title: "Error",
-          description: "Failed to load purchased items",
+          description: "Failed to load your barracks items",
           variant: "destructive",
         })
-      } finally {
-        setLoading(false)
+        return
       }
-    }
 
+      if (barracksItems) {
+        setPurchasedItems(barracksItems.map(item => ({
+          id: item.auction_id,
+          title: item.title,
+          description: item.description,
+          type: item.auction_type,
+          status: item.barracks_status,
+          plan_id: item.plan_id,
+          paid_at: item.paid_at,
+          amount_cents: item.amount_cents,
+          digital_product: item.digital_delivery_type ? {
+            delivery_type: item.digital_delivery_type,
+            file_url: item.digital_file_path,
+            download_link: item.digital_download_link,
+            discount_code: item.digital_discount_code
+          } : undefined,
+          shipping_address: item.shipping_address,
+          tracking_link: item.tracking_number ? `https://tracking.example.com/${item.tracking_number}` : undefined,
+          seller_info: {
+            username: item.seller_id,
+            email: `${item.seller_id}@example.com`
+          }
+        })))
+      }
+    } catch (error) {
+      console.error('Error loading purchased items:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load purchased items",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
     loadPurchasedItems()
   }, [])
 
@@ -195,6 +209,76 @@ export default function BarracksPage() {
     }
   }
 
+
+
+  const handleRetryPayment = async (item: PurchasedItem) => {
+    try {
+      // Check if we have the Whop iApp purchase available
+      if (typeof window !== 'undefined' && (window as any).Whop) {
+        const whop = (window as any).Whop
+        
+        // Open the payment modal using the existing plan ID
+        const result = await whop.openPurchaseModal({
+          planId: item.plan_id,
+          onSuccess: () => {
+            toast({
+              title: "Payment Successful! 🎉",
+              description: "Your payment has been processed. The item will be available shortly once verified.",
+            })
+            // Refresh the items to show updated status
+            loadPurchasedItems()
+          },
+          onError: (error: any) => {
+            console.error('Payment error:', error)
+            toast({
+              title: "Payment Failed",
+              description: "There was an issue processing your payment. Please try again.",
+              variant: "destructive",
+            })
+          },
+          onClose: () => {
+            console.log('Payment modal closed')
+          }
+        })
+      } else {
+        // Fallback: redirect to Whop purchase page
+        const purchaseUrl = `https://whop.com/checkout/${item.plan_id}`
+        window.open(purchaseUrl, '_blank')
+        
+        toast({
+          title: "Opening Payment Page",
+          description: "Redirecting to payment page in a new tab.",
+        })
+      }
+    } catch (error) {
+      console.error('Error retrying payment:', error)
+      toast({
+        title: "Error",
+        description: "Failed to open payment modal. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleVerifyPayment = async (itemId: string) => {
+    try {
+      const response = await fetch('/api/barracks/verify-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barracksItemId: itemId })
+      })
+      if (response.ok) {
+        toast({ title: "Payment Verified! 🎉", description: "Item marked as paid for testing." })
+        loadPurchasedItems()
+      } else {
+        toast({ title: "Verification Failed", description: "Failed to verify payment.", variant: "destructive" })
+      }
+    } catch (error) {
+      console.error('Error verifying payment:', error)
+      toast({ title: "Error", description: "Failed to verify payment.", variant: "destructive" })
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
@@ -274,6 +358,8 @@ export default function BarracksPage() {
                   onDownload={handleDownload}
                   onMarkReceived={handleMarkAsReceived}
                   onUpdateShippingAddress={handleUpdateShippingAddress}
+                  onRetryPayment={handleRetryPayment}
+                  onVerifyPayment={handleVerifyPayment}
                 />
               ))}
             </div>
@@ -290,6 +376,8 @@ export default function BarracksPage() {
                     onDownload={handleDownload}
                     onMarkReceived={handleMarkAsReceived}
                     onUpdateShippingAddress={handleUpdateShippingAddress}
+                    onRetryPayment={handleRetryPayment}
+                    onVerifyPayment={handleVerifyPayment}
                   />
                 ))}
             </div>
@@ -306,6 +394,8 @@ export default function BarracksPage() {
                     onDownload={handleDownload}
                     onMarkReceived={handleMarkAsReceived}
                     onUpdateShippingAddress={handleUpdateShippingAddress}
+                    onRetryPayment={handleRetryPayment}
+                    onVerifyPayment={handleVerifyPayment}
                   />
                 ))}
             </div>
@@ -314,7 +404,7 @@ export default function BarracksPage() {
           <TabsContent value="pending" className="mt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {purchasedItems
-                .filter(item => item.status === 'PAID')
+                .filter(item => item.status === 'PENDING_PAYMENT')
                 .map((item) => (
                   <PurchasedItemCard 
                     key={item.id} 
@@ -322,6 +412,8 @@ export default function BarracksPage() {
                     onDownload={handleDownload}
                     onMarkReceived={handleMarkAsReceived}
                     onUpdateShippingAddress={handleUpdateShippingAddress}
+                    onRetryPayment={handleRetryPayment}
+                    onVerifyPayment={handleVerifyPayment}
                   />
                 ))}
             </div>
@@ -429,12 +521,16 @@ function PurchasedItemCard({
   item, 
   onDownload, 
   onMarkReceived,
-  onUpdateShippingAddress
+  onUpdateShippingAddress,
+  onRetryPayment,
+  onVerifyPayment
 }: { 
   item: PurchasedItem
   onDownload: (item: PurchasedItem) => void
   onMarkReceived: (itemId: string) => void
   onUpdateShippingAddress: (itemId: string, shippingAddress: any) => void
+  onRetryPayment: (item: PurchasedItem) => void
+  onVerifyPayment: (itemId: string) => void
 }) {
   return (
     <Card className="hover:shadow-lg transition-shadow">
@@ -471,7 +567,7 @@ function PurchasedItemCard({
           )}
 
           {/* Digital Product */}
-          {item.type === 'DIGITAL' && item.digital_product && (
+          {item.type === 'DIGITAL' && item.digital_product && item.status === 'PAID' && (
             <div className="space-y-2">
               <h4 className="font-semibold">Digital Product</h4>
               
@@ -499,6 +595,35 @@ function PurchasedItemCard({
                   <div className="font-mono text-lg text-center mt-1">{item.digital_product.discount_code}</div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Pending Payment Notice */}
+          {item.type === 'DIGITAL' && item.status === 'PENDING_PAYMENT' && (
+            <div className="space-y-3">
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-yellow-600" />
+                  <p className="text-sm text-yellow-800">Payment pending. Digital content will be available once payment is confirmed.</p>
+                </div>
+              </div>
+              
+              {/* Pay Now Button */}
+              <Button 
+                onClick={() => onRetryPayment(item)} 
+                className="w-full bg-green-600 hover:bg-green-700"
+              >
+                💳 Pay Now
+              </Button>
+              
+              {/* Manual Verify Button (for testing) */}
+              <Button 
+                onClick={() => onVerifyPayment(item.id)} 
+                className="w-full bg-purple-600 hover:bg-purple-700"
+                variant="outline"
+              >
+                🔍 Verify Payment (Test)
+              </Button>
             </div>
           )}
 

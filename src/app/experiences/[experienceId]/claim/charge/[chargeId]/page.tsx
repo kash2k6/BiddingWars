@@ -113,7 +113,7 @@ export default function ClaimPage() {
     
     setClaiming(true)
     try {
-      const supabase = createClient()
+      const supabase = supabaseClient
       const { error } = await supabase
         .from('auctions')
         .update({ status: 'FULFILLED' })

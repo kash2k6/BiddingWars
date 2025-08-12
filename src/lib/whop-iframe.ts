@@ -109,7 +109,7 @@ export async function createInAppPurchase(paymentData: any) {
     
     return {
       success: false,
-      error: `Failed to open payment: ${error.message}`,
+      error: `Failed to open payment: ${error instanceof Error ? error.message : 'Unknown error'}`,
       chargeId: paymentData?.charge?.id || paymentData?.id,
       sessionId: null,
       receiptId: null

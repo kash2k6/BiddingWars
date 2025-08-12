@@ -359,6 +359,7 @@ export default function AuctionDetailPage() {
   const isLive = auction?.status === 'LIVE'
   const isEnded = auction?.status === 'ENDED'
   const isPaid = auction?.status === 'PAID'
+  const isScheduled = auction?.status === 'COMING_SOON'
   const isWinner = auction?.winner_user_id === currentUserId
   const isCreator = auction?.created_by_user_id === currentUserId
   const currentBid = bids.length > 0 ? Math.max(...bids.map(bid => bid.amount_cents)) : auction?.start_price_cents || 0
@@ -526,7 +527,13 @@ export default function AuctionDetailPage() {
                   <div className="text-center sm:text-left">
                     <p className="text-sm text-gray-400 mb-2">⏰ Time Remaining</p>
                     <div className="flex justify-center sm:justify-start">
-                      <Countdown endTime={auction.ends_at} className="text-lg" />
+                      <Countdown 
+                        endTime={auction.ends_at} 
+                        startTime={auction.starts_at}
+                        className="text-lg" 
+                        playSound={true}
+                        auctionStatus={auction.status}
+                      />
                     </div>
                   </div>
                   <div className="text-center sm:text-right">
@@ -574,7 +581,14 @@ export default function AuctionDetailPage() {
                 </div>
               )}
 
-              {isCreator && (
+              {auction.status === 'COMING_SOON' && (
+                <div className="text-center p-4 bg-blue-500/20 rounded-lg border border-blue-500/30">
+                  <p className="text-blue-300">⏰ This auction hasn't started yet</p>
+                  <p className="text-blue-200 text-sm mt-1">Bidding will be available when the auction goes live</p>
+                </div>
+              )}
+
+              {isCreator && auction.status === 'LIVE' && (
                 <div className="text-center p-4 bg-blue-500/20 rounded-lg border border-blue-500/30">
                   <p className="text-blue-300">🎯 This is your auction - you cannot bid on your own items</p>
                 </div>

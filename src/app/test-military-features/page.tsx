@@ -92,6 +92,8 @@ export default function TestMilitaryFeaturesPage() {
                   duration: 3000
                 })
               }}
+              playSound={true}
+              auctionStatus="LIVE"
             />
           </div>
           <div className="text-center">

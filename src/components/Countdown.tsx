@@ -1,18 +1,29 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Clock, Zap, Flame, Target, AlertTriangle } from "lucide-react"
 import { SoundManager } from "@/lib/sound-effects"
 
 interface CountdownProps {
   endTime: string
+  startTime?: string // Add start time prop
   onEnd?: () => void
   className?: string
   variant?: 'default' | 'critical' | 'warning' | 'success'
+  playSound?: boolean // New prop to control sound playing
+  auctionStatus?: string // New prop to check auction status
 }
 
-export function Countdown({ endTime, onEnd, className, variant = 'default' }: CountdownProps) {
+export function Countdown({ 
+  endTime, 
+  startTime,
+  onEnd, 
+  className, 
+  variant = 'default',
+  playSound = false,
+  auctionStatus = 'LIVE'
+}: CountdownProps) {
   const [timeLeft, setTimeLeft] = useState<{
     days: number
     hours: number
@@ -20,20 +31,44 @@ export function Countdown({ endTime, onEnd, className, variant = 'default' }: Co
     seconds: number
   }>({ days: 0, hours: 0, minutes: 0, seconds: 0 })
   const [isEnded, setIsEnded] = useState(false)
+  const [isScheduled, setIsScheduled] = useState(false)
   const [pulseIntensity, setPulseIntensity] = useState(1)
+  const soundPlayedRef = useRef(false) // Track if sound has been played
 
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date().getTime()
       const end = new Date(endTime).getTime()
+      const start = startTime ? new Date(startTime).getTime() : 0
+      
+      // Check if auction is scheduled/draft (hasn't started yet)
+      if (startTime && now < start) {
+        const timeUntilStart = start - now
+        const days = Math.floor(timeUntilStart / (1000 * 60 * 60 * 24))
+        const hours = Math.floor((timeUntilStart % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+        const minutes = Math.floor((timeUntilStart % (1000 * 60 * 60)) / (1000 * 60))
+        const seconds = Math.floor((timeUntilStart % (1000 * 60)) / 1000)
+
+        setTimeLeft({ days, hours, minutes, seconds })
+        setIsScheduled(true)
+        setIsEnded(false)
+        return
+      }
+
       const difference = end - now
 
       if (difference <= 0) {
-        setIsEnded(true)
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
-        // Play auction ending sound
-        SoundManager.playAuctionEnding()
-        onEnd?.()
+        // Only mark as ended if auction status is actually ENDED
+        if (auctionStatus === 'ENDED' || auctionStatus === 'PAID') {
+          setIsEnded(true)
+          setIsScheduled(false)
+          setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+          onEnd?.()
+        } else {
+          // If auction hasn't ended yet, keep showing countdown
+          setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+          setIsScheduled(false)
+        }
         clearInterval(timer)
       } else {
         const days = Math.floor(difference / (1000 * 60 * 60 * 24))
@@ -42,6 +77,13 @@ export function Countdown({ endTime, onEnd, className, variant = 'default' }: Co
         const seconds = Math.floor((difference % (1000 * 60)) / 1000)
 
         setTimeLeft({ days, hours, minutes, seconds })
+        setIsScheduled(false)
+
+        // Play countdown sound only in last 10 seconds and only once
+        if (playSound && minutes === 0 && seconds <= 10 && !soundPlayedRef.current) {
+          SoundManager.playAuctionEnding()
+          soundPlayedRef.current = true
+        }
 
         // Increase pulse intensity as time runs out
         if (minutes === 0 && seconds <= 30) {
@@ -57,7 +99,7 @@ export function Countdown({ endTime, onEnd, className, variant = 'default' }: Co
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [endTime, onEnd])
+  }, [endTime, startTime, onEnd, playSound, auctionStatus])
 
   const formatTime = (time: number) => time.toString().padStart(2, '0')
   
@@ -101,7 +143,25 @@ export function Countdown({ endTime, onEnd, className, variant = 'default' }: Co
   const isWarning = timeLeft.minutes === 0 && timeLeft.seconds <= 60
   const isEngagement = timeLeft.minutes <= 5
 
-  if (isEnded) {
+  // Show "Starting Soon" for scheduled auctions
+  if (isScheduled) {
+    return (
+      <div className={`text-center ${className}`}>
+        <div className="bg-gradient-to-r from-blue-600 to-purple-700 text-white px-3 py-2 rounded-lg shadow-lg border border-blue-500/50 transform transition-all duration-300">
+          <div className="flex items-center justify-center gap-2">
+            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+            <span className="text-sm font-bold tracking-wider">STARTING SOON</span>
+          </div>
+          <div className="text-xs mt-1 opacity-90">
+            {formatDisplay()}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Only show "Mission Complete" if auction is actually ended
+  if (isEnded && (auctionStatus === 'ENDED' || auctionStatus === 'PAID')) {
     return (
       <div className={`text-center ${className}`}>
         <div className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-3 py-2 rounded-lg shadow-lg border border-gray-500/50 transform transition-all duration-300">

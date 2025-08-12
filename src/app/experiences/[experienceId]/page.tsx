@@ -75,7 +75,7 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
           .from('auctions')
           .select('*')
           .eq('experience_id', params.experienceId)
-          .eq('status', 'LIVE')
+          .in('status', ['LIVE', 'COMING_SOON']) // Show both live and coming soon auctions
           .order('created_at', { ascending: false })
 
         if (error) throw error

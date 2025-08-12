@@ -21,9 +21,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 1. Check if user has access to the plan
-    const accessCheck = await whopSdk.access.checkAccess({
+    const accessCheck = await whopSdk.access.checkIfUserHasAccessToAccessPass({
+      accessPassId: planId,
       userId: actualUserId,
-      planId: planId,
     })
 
     console.log('Access check result:', accessCheck)
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       hasAccess: false,
       error: "Failed to check access",
-      details: error.message 
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
 }

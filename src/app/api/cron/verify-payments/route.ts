@@ -44,102 +44,124 @@ export async function POST(request: NextRequest) {
           appApiKey: process.env.WHOP_API_KEY!
         })
 
-        // Check if user has access to the plan (this verifies payment was successful)
-        const hasAccess = await whopSdk.access.checkIfUserHasAccessToAccessPass({
-          accessPassId: item.plan_id,
-          userId: item.user_id
-        })
+        // Use Whop V5 API to check the actual payment status
+        try {
+          // Get the payment details using the payment_id
+          const paymentResponse = await fetch(`https://api.whop.com/v5/app/payments/${item.payment_id}`, {
+            headers: {
+              'Authorization': `Bearer ${process.env.WHOP_API_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          })
 
-        console.log(`Checking payment status for item ${item.id}: User has access to plan ${item.plan_id}: ${hasAccess.hasAccess}`)
-        
-        if (hasAccess.hasAccess) {
-          // Payment confirmed - update barracks item status
-          const { error: updateError } = await supabaseServer
-            .from('barracks_items')
-            .update({
-              status: 'PAID',
-              paid_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', item.id)
-
-          if (updateError) {
-            console.error(`Error updating barracks item ${item.id}:`, updateError)
-            errors.push(`Failed to update barracks item ${item.id}`)
+          if (!paymentResponse.ok) {
+            console.error(`Failed to fetch payment ${item.payment_id}: ${paymentResponse.status}`)
             continue
           }
 
-          // Update auction status to PAID
-          const { error: auctionError } = await supabaseServer
-            .from('auctions')
-            .update({
-              status: 'PAID',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', item.auction_id)
+          const paymentData = await paymentResponse.json()
+          console.log(`Payment status for ${item.payment_id}: ${paymentData.status}`)
+          console.log(`Payment data for ${item.payment_id}:`, JSON.stringify(paymentData, null, 2))
 
-          if (auctionError) {
-            console.error(`Error updating auction ${item.auction_id}:`, auctionError)
-            errors.push(`Failed to update auction ${item.auction_id}`)
-            continue
+          // Check if payment is successful (API returns "paid" not "succeeded")
+          // Also check if it's not refunded
+          if (paymentData.status === 'paid' && paymentData.paid_at && !paymentData.refunded_at) {
+            // Payment confirmed - update barracks item status
+            const { error: updateError } = await supabaseServer
+              .from('barracks_items')
+              .update({
+                status: 'PAID',
+                paid_at: new Date(paymentData.paid_at * 1000).toISOString(), // Convert timestamp to ISO
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', item.id)
+
+            if (updateError) {
+              console.error(`Error updating barracks item ${item.id}:`, updateError)
+              errors.push(`Failed to update barracks item ${item.id}`)
+              continue
+            }
+
+            // Update auction status to PAID
+            const { error: auctionError } = await supabaseServer
+              .from('auctions')
+              .update({
+                status: 'PAID',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', item.auction_id)
+
+            if (auctionError) {
+              console.error(`Error updating auction ${item.auction_id}:`, auctionError)
+              errors.push(`Failed to update auction ${item.auction_id}`)
+              continue
+            }
+
+            // Create winning bid record
+            const { error: winningBidError } = await supabaseServer
+              .from('winning_bids')
+              .insert({
+                auction_id: item.auction_id,
+                user_id: item.user_id,
+                bid_id: item.auction?.current_bid_id,
+                amount_cents: item.amount_cents,
+                payment_processed: true,
+                payment_id: item.payment_id
+              })
+              .single()
+
+            if (winningBidError) {
+              console.error(`Error creating winning bid for auction ${item.auction_id}:`, winningBidError)
+              errors.push(`Failed to create winning bid for auction ${item.auction_id}`)
+              continue
+            }
+
+            console.log(`Payment verified for item ${item.id} - Item now accessible in barracks`)
+            verifiedCount++
+
+          } else if (paymentData.status === 'failed' || paymentData.status === 'canceled' || paymentData.refunded_at) {
+            // Payment failed - remove from barracks and reset auction
+            const { error: deleteError } = await supabaseServer
+              .from('barracks_items')
+              .delete()
+              .eq('id', item.id)
+
+            if (deleteError) {
+              console.error(`Error removing failed barracks item ${item.id}:`, deleteError)
+              errors.push(`Failed to remove failed barracks item ${item.id}`)
+              continue
+            }
+
+            // Reset auction status back to ENDED so it can be relisted
+            const { error: resetError } = await supabaseServer
+              .from('auctions')
+              .update({
+                status: 'ENDED',
+                winner_user_id: null,
+                current_bid_id: null,
+                payment_id: null,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', item.auction_id)
+
+            if (resetError) {
+              console.error(`Error resetting auction ${item.auction_id}:`, resetError)
+              errors.push(`Failed to reset auction ${item.auction_id}`)
+              continue
+            }
+
+            const reason = paymentData.refunded_at ? 'refunded' : paymentData.status
+            console.log(`Payment ${reason} for item ${item.id} - Item removed from barracks, auction reset`)
+            verifiedCount++
+
+          } else {
+            // Payment is still pending (draft, processing, etc.)
+            console.log(`Payment ${item.payment_id} is still pending with status: ${paymentData.status}`)
           }
 
-          // Create winning bid record
-          const { error: winningBidError } = await supabaseServer
-            .from('winning_bids')
-            .insert({
-              auction_id: item.auction_id,
-              user_id: item.user_id,
-              bid_id: item.auction.current_bid_id,
-              amount_cents: item.amount_cents,
-              payment_processed: true,
-              payment_id: item.payment_id
-            })
-            .single()
-
-          if (winningBidError) {
-            console.error(`Error creating winning bid for auction ${item.auction_id}:`, winningBidError)
-            errors.push(`Failed to create winning bid for auction ${item.auction_id}`)
-            continue
-          }
-
-          console.log(`Payment verified for item ${item.id} - Item now accessible in barracks`)
-          verifiedCount++
-
-        } else {
-          // User doesn't have access - payment failed or was canceled
-          // Payment failed - remove from barracks and reset auction
-          const { error: deleteError } = await supabaseServer
-            .from('barracks_items')
-            .delete()
-            .eq('id', item.id)
-
-          if (deleteError) {
-            console.error(`Error removing failed barracks item ${item.id}:`, deleteError)
-            errors.push(`Failed to remove failed barracks item ${item.id}`)
-            continue
-          }
-
-          // Reset auction status back to ENDED so it can be relisted
-          const { error: resetError } = await supabaseServer
-            .from('auctions')
-            .update({
-              status: 'ENDED',
-              winner_user_id: null,
-              current_bid_id: null,
-              payment_id: null,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', item.auction_id)
-
-          if (resetError) {
-            console.error(`Error resetting auction ${item.auction_id}:`, resetError)
-            errors.push(`Failed to reset auction ${item.auction_id}`)
-            continue
-          }
-
-          console.log(`Payment failed for item ${item.id} - Item removed from barracks, auction reset`)
-          verifiedCount++
+        } catch (paymentError) {
+          console.error(`Error checking payment status for ${item.payment_id}:`, paymentError)
+          errors.push(`Failed to check payment status for ${item.payment_id}`)
         }
 
       } catch (error) {

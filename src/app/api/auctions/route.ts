@@ -100,6 +100,9 @@ export async function POST(request: NextRequest) {
       digital_instructions: digitalProduct.instructions,
     } : {}
 
+    // Determine auction status based on start time
+    const auctionStatus = startDate > now ? 'COMING_SOON' : 'LIVE' // Use COMING_SOON for future auctions
+
     // Create auction
     const { data: auction, error } = await supabaseServer
       .from('auctions')
@@ -117,7 +120,7 @@ export async function POST(request: NextRequest) {
         buy_now_price_cents: buyNowPriceCents,
         community_pct: communityPct,
         shipping_cost_cents: shippingCostCents,
-        status: 'LIVE', // Start immediately
+        status: auctionStatus, // Use calculated status instead of always LIVE
         ...digitalData,
       })
       .select()

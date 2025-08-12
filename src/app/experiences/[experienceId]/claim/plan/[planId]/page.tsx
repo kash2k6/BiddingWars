@@ -160,7 +160,7 @@ export default function ClaimByPlanIdPage() {
         })
         
         // Update barracks item status
-        const supabase = createClient()
+        const supabase = supabaseClient
         await supabase
           .from('barracks_items')
           .update({ status: 'PAID', paid_at: new Date().toISOString() })
