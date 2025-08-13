@@ -60,7 +60,8 @@ export async function POST(request: NextRequest) {
           plan_id: result.inAppPurchase.planId,
           amount_cents: amount,
           payment_id: result.inAppPurchase.id,
-          status: 'PENDING_PAYMENT'
+          status: 'PENDING_PAYMENT',
+          paid_at: null // Explicitly set to null for PENDING_PAYMENT status
         })
         .select()
         .single()
