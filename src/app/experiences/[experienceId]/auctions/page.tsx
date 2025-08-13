@@ -201,10 +201,20 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
     try {
       console.log('🚀 Ending auction early:', auctionId)
       
+      // Get user context for headers
+      const contextResponse = await fetch('/api/whop-context')
+      if (!contextResponse.ok) {
+        throw new Error('Failed to get user context')
+      }
+      const context = await contextResponse.json()
+      
       const response = await fetch(`/api/auctions/${auctionId}/end`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-whop-user-token': context.userId,
+          'x-whop-experience-id': context.experienceId,
+          'x-whop-company-id': context.companyId || '',
         },
       })
 
@@ -225,8 +235,23 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
           : "Auction ended with no bids",
       })
 
-      // Refresh the page to update the UI
-      window.location.reload()
+      // Update local state instead of reloading
+      setAuctions(prevAuctions => 
+        prevAuctions.map(auction => 
+          auction.id === auctionId 
+            ? { ...auction, status: 'ENDED', ends_at: new Date().toISOString() }
+            : auction
+        )
+      )
+      
+      // Also update pastAuctions if needed
+      setPastAuctions(prevPastAuctions => {
+        const endedAuction = auctions.find(a => a.id === auctionId)
+        if (endedAuction) {
+          return [{ ...endedAuction, status: 'ENDED', ends_at: new Date().toISOString() }, ...prevPastAuctions]
+        }
+        return prevPastAuctions
+      })
     } catch (error) {
       console.error('❌ Error ending auction:', error)
       toast({
@@ -299,7 +324,7 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
         throw new Error(result.error || 'Failed to mark as shipped')
       }
 
-      console.log('✅ Success! Resetting form and reloading...')
+      console.log('✅ Success! Resetting form and updating state...')
       
       // Reset form and hide it
       setShowShippingForm(false)
@@ -309,8 +334,14 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
         shippingCarrier: ''
       })
 
-      // Refresh the page to update the UI
-      window.location.reload()
+      // Update local state instead of reloading
+      setAuctions(prevAuctions => 
+        prevAuctions.map(auction => 
+          auction.id === shippingForm.auctionId 
+            ? { ...auction, status: 'SHIPPED' }
+            : auction
+        )
+      )
     } catch (error) {
       console.error('❌ Error marking as shipped:', error)
       alert('Failed to mark as shipped: ' + (error instanceof Error ? error.message : 'Unknown error'))
@@ -407,7 +438,7 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
         </Badge>
       </div>
 
-      <Tabs defaultValue="scheduled" className="w-full">
+      <Tabs defaultValue="live" className="w-full">
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="scheduled" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
@@ -533,14 +564,20 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
                         </Button>
                       )}
                       {getUserRole(auction) === 'CREATOR' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEndEarly(auction.id)}
-                          className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-bold"
-                        >
-                          End Early
-                        </Button>
+                        <>
+                          {console.log('🎯 Rendering End Early button for auction:', auction.id, 'User role:', getUserRole(auction))}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              console.log('🔘 End Early button clicked for auction:', auction.id)
+                              handleEndEarly(auction.id)
+                            }}
+                            className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-bold"
+                          >
+                            End Early
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>

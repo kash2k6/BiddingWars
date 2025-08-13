@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
-import { getWhopContext } from '@/lib/whop-context'
 
 export async function POST(
   request: NextRequest,
@@ -9,14 +8,28 @@ export async function POST(
   try {
     console.log('POST /api/auctions/[id]/end called for auction:', params.id)
     
-    // Get user context
-    const context = await getWhopContext()
-    if (!context) {
-      return NextResponse.json({ error: 'Failed to get user context' }, { status: 401 })
+    // Extract user context from headers (server-side)
+    const userToken = request.headers.get('x-whop-user-token')
+    const experienceId = request.headers.get('x-whop-experience-id')
+    const companyId = request.headers.get('x-whop-company-id')
+    
+    if (!userToken || !experienceId) {
+      console.error('Missing required headers')
+      return NextResponse.json({ error: 'Missing user context' }, { status: 401 })
     }
 
-    const { userId, experienceId } = context
-    console.log('User context:', { userId, experienceId })
+    // Extract user ID from JWT token
+    let userId: string
+    try {
+      const payload = JSON.parse(Buffer.from(userToken.split('.')[1], 'base64').toString())
+      userId = payload.sub
+      console.log('Extracted user ID from JWT:', userId)
+    } catch (error) {
+      console.error('Failed to parse JWT token:', error)
+      return NextResponse.json({ error: 'Invalid user token' }, { status: 401 })
+    }
+
+    console.log('User context:', { userId, experienceId, companyId })
 
     // Get auction data
     const { data: auction, error: auctionError } = await supabaseServer
