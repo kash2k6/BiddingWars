@@ -87,6 +87,10 @@ export default function AdminPage({ params }: { params: { experienceId: string }
   const [transferFee, setTransferFee] = useState<any>(null)
   const [ledgerBalance, setLedgerBalance] = useState<number>(0)
 
+  // Check if user is the main admin
+  const isMainAdmin = adminUser?.userId === 'user_ojPhs9dIhFQ9C'
+  const isCompanyOwner = adminUser?.isAdmin && !isMainAdmin
+
   useEffect(() => {
     async function checkAdmin() {
       try {
@@ -438,18 +442,19 @@ export default function AdminPage({ params }: { params: { experienceId: string }
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-3xl font-bold bg-gradient-to-r from-purple-500 to-pink-600 bg-clip-text text-transparent">
-            🛡️ ADMIN DASHBOARD 🛡️
+            {isMainAdmin ? '🛡️ ADMIN DASHBOARD 🛡️' : '📊 COMMUNITY STATISTICS 📊'}
           </h2>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
-            <span className="text-sm text-purple-600 font-semibold">ADMIN</span>
+            <span className="text-sm text-purple-600 font-semibold">
+              {isMainAdmin ? 'ADMIN' : 'COMMUNITY OWNER'}
+            </span>
           </div>
           {adminUser && (
             <div className="flex items-center gap-2 text-sm text-gray-400">
               <Shield className="h-4 w-4" />
-
               <span>•</span>
-              <span>Role: {adminUser.role}</span>
+              <span>Role: {isMainAdmin ? 'Main Admin' : 'Community Owner'}</span>
               {adminUser.companyName && (
                 <>
                   <span>•</span>
@@ -460,7 +465,7 @@ export default function AdminPage({ params }: { params: { experienceId: string }
           )}
         </div>
         <div className="flex gap-2">
-          {adminUser?.companyId && (
+          {isMainAdmin && adminUser?.companyId && (
             <Button
               onClick={() => loadReceipts(adminUser.companyId)}
               variant="outline"
@@ -470,18 +475,20 @@ export default function AdminPage({ params }: { params: { experienceId: string }
               Refresh
             </Button>
           )}
-          <Button
-            onClick={exportReceipts}
-            variant="outline"
-            className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
+          {isMainAdmin && (
+            <Button
+              onClick={exportReceipts}
+              variant="outline"
+              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Comprehensive Statistics Cards */}
+      {/* Stats Cards - Available to all admins */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
         <Card className="bg-gradient-to-br from-slate-800/80 to-purple-800/80 backdrop-blur-sm border border-purple-500/30">
           <CardContent className="p-4">
@@ -556,407 +563,441 @@ export default function AdminPage({ params }: { params: { experienceId: string }
         </Card>
       </div>
 
-      {/* Manual Payout Section */}
-      <Card className="bg-gradient-to-br from-slate-800/80 to-purple-800/80 backdrop-blur-sm border border-purple-500/30">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Send className="h-5 w-5" />
-            Manual Payout
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Recipient User ID
-              </label>
-              <input
-                type="text"
-                value={payoutRecipient}
-                onChange={(e) => setPayoutRecipient(e.target.value)}
-                placeholder="user_xxxxxxxxx"
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Amount (USD)
-              </label>
-              <input
-                type="number"
-                value={payoutAmount}
-                onChange={(e) => setPayoutAmount(e.target.value)}
-                placeholder="10.00"
-                step="0.01"
-                min="0"
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Notes (Optional)
-              </label>
-              <input
-                type="text"
-                value={payoutNotes}
-                onChange={(e) => setPayoutNotes(e.target.value)}
-                placeholder="Reason for payout"
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-          </div>
-          <div className="mt-4">
-            <Button
-              onClick={handleManualPayout}
-              disabled={payoutLoading || !payoutRecipient || !payoutAmount}
-              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold"
-            >
-              {payoutLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Send Payout
-                </>
-              )}
-            </Button>
-          </div>
-          <div className="mt-3 text-sm text-gray-400">
-            <p><strong>Your User ID:</strong> {adminUser?.userId}</p>
-            <p><strong>Company ID:</strong> {adminUser?.companyId || 'None'}</p>
-            <p><strong>Experience ID:</strong> {adminUser?.experienceId}</p>
-            {transferFee && (
-              <div className="mt-3 p-3 bg-blue-900/30 rounded border border-blue-500/30">
-                <p className="text-sm text-blue-300">
-                  <strong>💰 Company Ledger Balance:</strong> ${ledgerBalance.toFixed(2)}
-                </p>
-                <p className="text-sm text-blue-300">
-                  <strong>💸 Transfer Fee:</strong> ${transferFee.dollars.toFixed(2)} per payout
-                </p>
-                            <p className="text-sm text-yellow-300 mt-1">
-              <strong>⚠️ Total Cost:</strong> Amount + ${transferFee.dollars.toFixed(2)} fee
-            </p>
-            <p className="text-sm text-green-300 mt-1">
-              <strong>✅ Minimum Payout:</strong> $1.00 (Whop requirement)
-            </p>
+      {/* Main Admin Only Sections */}
+      {isMainAdmin && (
+        <>
+          {/* Manual Payout Section */}
+          <Card className="bg-gradient-to-br from-slate-800/80 to-purple-800/80 backdrop-blur-sm border border-purple-500/30">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Send className="h-5 w-5" />
+                Manual Payout (Admin Only)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Recipient User ID
+                  </label>
+                  <input
+                    type="text"
+                    value={payoutRecipient}
+                    onChange={(e) => setPayoutRecipient(e.target.value)}
+                    placeholder="user_xxxxxxxxx"
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Amount (USD)
+                  </label>
+                  <input
+                    type="number"
+                    value={payoutAmount}
+                    onChange={(e) => setPayoutAmount(e.target.value)}
+                    placeholder="10.00"
+                    step="0.01"
+                    min="0"
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Notes (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={payoutNotes}
+                    onChange={(e) => setPayoutNotes(e.target.value)}
+                    placeholder="Reason for payout"
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              <div className="mt-4">
+                <Button
+                  onClick={handleManualPayout}
+                  disabled={payoutLoading || !payoutRecipient || !payoutAmount}
+                  className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold"
+                >
+                  {payoutLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Send Payout
+                    </>
+                  )}
+                </Button>
+              </div>
+              <div className="mt-3 text-sm text-gray-400">
+                <p><strong>Your User ID:</strong> {adminUser?.userId}</p>
+                <p><strong>Company ID:</strong> {adminUser?.companyId || 'None'}</p>
+                <p><strong>Experience ID:</strong> {adminUser?.experienceId}</p>
+                {transferFee && (
+                  <div className="mt-3 p-3 bg-blue-900/30 rounded border border-blue-500/30">
+                    <p className="text-sm text-blue-300">
+                      <strong>💰 Company Ledger Balance:</strong> ${ledgerBalance.toFixed(2)}
+                    </p>
+                    <p className="text-sm text-blue-300">
+                      <strong>💸 Transfer Fee:</strong> ${transferFee.dollars.toFixed(2)} per payout
+                    </p>
+                    <p className="text-sm text-yellow-300 mt-1">
+                      <strong>⚠️ Total Cost:</strong> Amount + ${transferFee.dollars.toFixed(2)} fee
+                    </p>
+                    <p className="text-sm text-green-300 mt-1">
+                      <strong>✅ Minimum Payout:</strong> $1.00 (Whop requirement)
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Community Owner Info */}
-      {communityOwner && (
+          {/* Community Owner Info */}
+          {communityOwner && (
+            <Card className="bg-gradient-to-br from-slate-800/80 to-blue-800/80 backdrop-blur-sm border border-blue-500/30">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Community Owner
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-400">Community</p>
+                    <p className="text-white font-medium">{communityOwner.companyName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400">Owner</p>
+                    <p className="text-white font-medium">{communityOwner.ownerUsername || communityOwner.ownerUserId || 'Unknown'}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Auction Payouts Section */}
+          <Card className="bg-gradient-to-br from-slate-800/80 to-green-800/80 backdrop-blur-sm border border-green-500/30">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                Auction Payouts (Admin Only)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Select Auction
+                  </label>
+                  <select
+                    value={selectedAuction}
+                    onChange={(e) => {
+                      setSelectedAuction(e.target.value)
+                      if (e.target.value) {
+                        loadPayoutBreakdown(e.target.value)
+                      } else {
+                        setPayoutBreakdown(null)
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="">Select an auction...</option>
+                    {auctions.map((auction) => (
+                      <option key={auction.id} value={auction.id}>
+                        {auction.title} - ${(auction.winning_bid?.amount_cents || 0) / 100}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {payoutBreakdown && (
+                  <div className="bg-gray-800/50 rounded-lg p-4">
+                    <h4 className="text-white font-medium mb-3">Payout Breakdown</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-gray-400">Total Amount</p>
+                        <p className="text-white font-medium">${payoutBreakdown.payoutBreakdown.totalAmount}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400">Your App Fee</p>
+                        <p className="text-white font-medium">${payoutBreakdown.payoutBreakdown.platformFee}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400">Seller Payout</p>
+                        <p className="text-white font-medium">${payoutBreakdown.payoutBreakdown.sellerAmount}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400">Community Owner Payout</p>
+                        <p className="text-white font-medium">${payoutBreakdown.payoutBreakdown.communityOwnerAmount}</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex gap-2">
+                      <Button
+                        onClick={() => {
+                          // Execute seller payout
+                          setPayoutRecipient(payoutBreakdown.auction.sellerUserId)
+                          setPayoutAmount(payoutBreakdown.payoutBreakdown.sellerAmount.toString())
+                          setPayoutNotes(`Seller payout for auction ${payoutBreakdown.auction.id}`)
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        size="sm"
+                      >
+                        Pay Seller
+                      </Button>
+                      {communityOwner?.ownerUserId && (
+                        <Button
+                          onClick={() => {
+                            // Execute community owner payout
+                            setPayoutRecipient(communityOwner.ownerUserId)
+                            setPayoutAmount(payoutBreakdown.payoutBreakdown.communityOwnerAmount.toString())
+                            setPayoutNotes(`Community owner payout for auction ${payoutBreakdown.auction.id}`)
+                          }}
+                          className="bg-purple-600 hover:bg-purple-700 text-white"
+                          size="sm"
+                        >
+                          Pay Community Owner
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Comprehensive Auctions Management Section */}
+          <Card className="bg-gradient-to-br from-slate-800/80 to-orange-800/80 backdrop-blur-sm border border-orange-500/30">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                ALL Auctions Management (Entire Database) - Admin Only
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-white font-medium">All Auctions Across All Experiences ({auctions.length})</h4>
+                  <Button
+                    onClick={() => adminUser?.experienceId && loadAuctions(adminUser.experienceId)}
+                    variant="outline"
+                    size="sm"
+                    className="bg-orange-600 hover:bg-orange-700 text-white"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh All Data
+                  </Button>
+                </div>
+                
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-orange-500/30">
+                        <th className="text-left p-2 text-gray-400">Title</th>
+                        <th className="text-left p-2 text-gray-400">Experience</th>
+                        <th className="text-left p-2 text-gray-400">Type</th>
+                        <th className="text-left p-2 text-gray-400">Status</th>
+                        <th className="text-left p-2 text-gray-400">Winner</th>
+                        <th className="text-left p-2 text-gray-400">Amount</th>
+                        <th className="text-left p-2 text-gray-400">Bids</th>
+                        <th className="text-left p-2 text-gray-400">Payment</th>
+                        <th className="text-left p-2 text-gray-400">Created</th>
+                        <th className="text-left p-2 text-gray-400">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auctions.map((auction) => (
+                        <tr key={auction.id} className="border-b border-orange-500/20 hover:bg-orange-500/10">
+                          <td className="p-2 text-white font-medium">
+                            <div className="max-w-xs truncate" title={auction.title}>
+                              {auction.title}
+                            </div>
+                          </td>
+                          <td className="p-2 text-white">
+                            <div className="text-xs">
+                              <div className="font-mono">{auction.experience_id?.slice(-8)}</div>
+                            </div>
+                          </td>
+                          <td className="p-2">
+                            <Badge 
+                              variant="outline"
+                              className={auction.type === 'PHYSICAL' ? 'border-blue-500 text-blue-400' : 'border-green-500 text-green-400'}
+                            >
+                              {auction.type}
+                            </Badge>
+                          </td>
+                          <td className="p-2">
+                            <Badge 
+                              variant={auction.status === 'LIVE' ? 'default' : 'secondary'}
+                              className={auction.status === 'LIVE' ? 'bg-green-600' : auction.status === 'ENDED' ? 'bg-orange-600' : 'bg-gray-600'}
+                            >
+                              {auction.status}
+                            </Badge>
+                          </td>
+                          <td className="p-2 text-white">
+                            <div className="text-xs">
+                              <div>Winner: {auction.winner_user_id || auction.winning_bid?.user_id || 'No winner'}</div>
+                              <div className="text-gray-400">Creator: {auction.created_by_user_id?.slice(-8)}</div>
+                            </div>
+                          </td>
+                          <td className="p-2 text-white font-medium">
+                            ${(auction.winning_bid?.amount_cents || auction.highest_bid_cents || 0) / 100}
+                          </td>
+                          <td className="p-2 text-white">
+                            <div className="text-xs">
+                              <div>{auction.total_bids || 0} bids</div>
+                              <div className="text-gray-400">Start: ${(auction.start_price_cents || 0) / 100}</div>
+                            </div>
+                          </td>
+                          <td className="p-2">
+                            <Badge 
+                              variant="outline"
+                              className={auction.payment_status === 'PAID' ? 'border-green-500 text-green-400' : 
+                                       auction.payment_status === 'PENDING' ? 'border-yellow-500 text-yellow-400' : 
+                                       'border-red-500 text-red-400'}
+                            >
+                              {auction.payment_status || 'UNKNOWN'}
+                            </Badge>
+                          </td>
+                          <td className="p-2 text-white">
+                            <div className="text-xs">
+                              <div>{new Date(auction.created_at).toLocaleDateString()}</div>
+                              <div className="text-gray-400">{new Date(auction.created_at).toLocaleTimeString()}</div>
+                            </div>
+                          </td>
+                          <td className="p-2">
+                            <div className="flex gap-1">
+                              {auction.winning_bid && auction.payment_status !== 'PAID' && (
+                                <Button
+                                  onClick={() => handleManualPaymentVerification(auction.id)}
+                                  size="sm"
+                                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
+                                >
+                                  Verify
+                                </Button>
+                              )}
+                              <Button
+                                onClick={() => {
+                                  setSelectedAuction(auction.id)
+                                  loadPayoutBreakdown(auction.id)
+                                }}
+                                size="sm"
+                                variant="outline"
+                                className="border-purple-500 text-purple-400 hover:bg-purple-500/20 text-xs"
+                              >
+                                Payout
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                
+                {auctions.length === 0 && (
+                  <div className="text-center py-8 text-gray-400">
+                    No auctions found in database.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Receipts Table */}
+          <Card className="bg-gradient-to-br from-slate-800/80 to-purple-800/80 backdrop-blur-sm border border-purple-500/30">
+            <CardHeader>
+              <CardTitle className="text-white">Payment Receipts (Admin Only)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-purple-500/30">
+                      <th className="text-left p-2 text-gray-400">Date</th>
+                      <th className="text-left p-2 text-gray-400">User</th>
+                      <th className="text-left p-2 text-gray-400">Amount</th>
+                      <th className="text-left p-2 text-gray-400">Status</th>
+                      <th className="text-left p-2 text-gray-400">Auction ID</th>
+                      <th className="text-left p-2 text-gray-400">Type</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {receipts.map((receipt) => (
+                      <tr key={receipt.id} className="border-b border-purple-500/20 hover:bg-purple-500/10">
+                        <td className="p-2 text-white">
+                          {new Date(receipt.paidAt * 1000).toLocaleDateString()}
+                        </td>
+                        <td className="p-2 text-white">
+                          {receipt.member?.user?.username || 'Unknown'}
+                        </td>
+                        <td className="p-2 text-white font-medium">
+                          {formatCurrency(receipt.settledUsdAmount * 100)}
+                        </td>
+                        <td className="p-2">
+                          <Badge 
+                            variant={receipt.status === 'succeeded' ? 'default' : 'secondary'}
+                            className={receipt.status === 'succeeded' ? 'bg-green-600' : 'bg-gray-600'}
+                          >
+                            {receipt.status}
+                          </Badge>
+                        </td>
+                        <td className="p-2 text-white">
+                          {receipt.metadata?.auctionId || 'N/A'}
+                        </td>
+                        <td className="p-2 text-white">
+                          {receipt.metadata?.type || 'N/A'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {receipts.length === 0 && (
+                <div className="text-center py-8 text-gray-400">
+                  No payment receipts found.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* Community Owner Read-Only Message */}
+      {isCompanyOwner && (
         <Card className="bg-gradient-to-br from-slate-800/80 to-blue-800/80 backdrop-blur-sm border border-blue-500/30">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Community Owner
+              <Shield className="h-5 w-5" />
+              Community Owner Access
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-400">Community</p>
-                <p className="text-white font-medium">{communityOwner.companyName}</p>
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Shield className="h-8 w-8 text-blue-400" />
               </div>
-              <div>
-                <p className="text-sm text-gray-400">Owner</p>
-                <p className="text-white font-medium">{communityOwner.ownerUsername || communityOwner.ownerUserId || 'Unknown'}</p>
+              <h3 className="text-xl font-bold text-white mb-2">Read-Only Access</h3>
+              <p className="text-gray-400 mb-4">
+                As a community owner, you can view statistics and revenue data for your community.
+                Only the main administrator can perform actions like manual payouts and payment verification.
+              </p>
+              <div className="bg-blue-900/30 rounded-lg p-4 text-sm text-blue-300">
+                <p><strong>Your User ID:</strong> {adminUser?.userId}</p>
+                <p><strong>Company:</strong> {adminUser?.companyName || 'Unknown'}</p>
+                <p><strong>Role:</strong> Community Owner</p>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
-
-      {/* Auction Payouts Section */}
-      <Card className="bg-gradient-to-br from-slate-800/80 to-green-800/80 backdrop-blur-sm border border-green-500/30">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
-            Auction Payouts
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Select Auction
-              </label>
-              <select
-                value={selectedAuction}
-                onChange={(e) => {
-                  setSelectedAuction(e.target.value)
-                  if (e.target.value) {
-                    loadPayoutBreakdown(e.target.value)
-                  } else {
-                    setPayoutBreakdown(null)
-                  }
-                }}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">Select an auction...</option>
-                {auctions.map((auction) => (
-                  <option key={auction.id} value={auction.id}>
-                    {auction.title} - ${(auction.winning_bids?.[0]?.amount_cents || 0) / 100}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {payoutBreakdown && (
-              <div className="bg-gray-800/50 rounded-lg p-4">
-                <h4 className="text-white font-medium mb-3">Payout Breakdown</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-gray-400">Total Amount</p>
-                    <p className="text-white font-medium">${payoutBreakdown.payoutBreakdown.totalAmount}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400">Your App Fee</p>
-                    <p className="text-white font-medium">${payoutBreakdown.payoutBreakdown.platformFee}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400">Seller Payout</p>
-                    <p className="text-white font-medium">${payoutBreakdown.payoutBreakdown.sellerAmount}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400">Community Owner Payout</p>
-                    <p className="text-white font-medium">${payoutBreakdown.payoutBreakdown.communityOwnerAmount}</p>
-                  </div>
-                </div>
-                <div className="mt-4 flex gap-2">
-                  <Button
-                    onClick={() => {
-                      // Execute seller payout
-                      setPayoutRecipient(payoutBreakdown.auction.sellerUserId)
-                      setPayoutAmount(payoutBreakdown.payoutBreakdown.sellerAmount.toString())
-                      setPayoutNotes(`Seller payout for auction ${payoutBreakdown.auction.id}`)
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                    size="sm"
-                  >
-                    Pay Seller
-                  </Button>
-                  {communityOwner?.ownerUserId && (
-                    <Button
-                      onClick={() => {
-                        // Execute community owner payout
-                        setPayoutRecipient(communityOwner.ownerUserId)
-                        setPayoutAmount(payoutBreakdown.payoutBreakdown.communityOwnerAmount.toString())
-                        setPayoutNotes(`Community owner payout for auction ${payoutBreakdown.auction.id}`)
-                      }}
-                      className="bg-purple-600 hover:bg-purple-700 text-white"
-                      size="sm"
-                    >
-                      Pay Community Owner
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Comprehensive Auctions Management Section */}
-      <Card className="bg-gradient-to-br from-slate-800/80 to-orange-800/80 backdrop-blur-sm border border-orange-500/30">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            ALL Auctions Management (Entire Database)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h4 className="text-white font-medium">All Auctions Across All Experiences ({auctions.length})</h4>
-              <Button
-                onClick={() => adminUser?.experienceId && loadAuctions(adminUser.experienceId)}
-                variant="outline"
-                size="sm"
-                className="bg-orange-600 hover:bg-orange-700 text-white"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh All Data
-              </Button>
-            </div>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-orange-500/30">
-                    <th className="text-left p-2 text-gray-400">Title</th>
-                    <th className="text-left p-2 text-gray-400">Experience</th>
-                    <th className="text-left p-2 text-gray-400">Type</th>
-                    <th className="text-left p-2 text-gray-400">Status</th>
-                    <th className="text-left p-2 text-gray-400">Winner</th>
-                    <th className="text-left p-2 text-gray-400">Amount</th>
-                    <th className="text-left p-2 text-gray-400">Bids</th>
-                    <th className="text-left p-2 text-gray-400">Payment</th>
-                    <th className="text-left p-2 text-gray-400">Created</th>
-                    <th className="text-left p-2 text-gray-400">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {auctions.map((auction) => (
-                    <tr key={auction.id} className="border-b border-orange-500/20 hover:bg-orange-500/10">
-                      <td className="p-2 text-white font-medium">
-                        <div className="max-w-xs truncate" title={auction.title}>
-                          {auction.title}
-                        </div>
-                      </td>
-                      <td className="p-2 text-white">
-                        <div className="text-xs">
-                          <div className="font-mono">{auction.experience_id?.slice(-8)}</div>
-                        </div>
-                      </td>
-                      <td className="p-2">
-                        <Badge 
-                          variant="outline"
-                          className={auction.type === 'PHYSICAL' ? 'border-blue-500 text-blue-400' : 'border-green-500 text-green-400'}
-                        >
-                          {auction.type}
-                        </Badge>
-                      </td>
-                      <td className="p-2">
-                        <Badge 
-                          variant={auction.status === 'LIVE' ? 'default' : 'secondary'}
-                          className={auction.status === 'LIVE' ? 'bg-green-600' : auction.status === 'ENDED' ? 'bg-orange-600' : 'bg-gray-600'}
-                        >
-                          {auction.status}
-                        </Badge>
-                      </td>
-                      <td className="p-2 text-white">
-                        <div className="text-xs">
-                          <div>Winner: {auction.winner_user_id || auction.winning_bid?.user_id || 'No winner'}</div>
-                          <div className="text-gray-400">Creator: {auction.created_by_user_id?.slice(-8)}</div>
-                        </div>
-                      </td>
-                      <td className="p-2 text-white font-medium">
-                        ${(auction.winning_bid?.amount_cents || auction.highest_bid_cents || 0) / 100}
-                      </td>
-                      <td className="p-2 text-white">
-                        <div className="text-xs">
-                          <div>{auction.total_bids || 0} bids</div>
-                          <div className="text-gray-400">Start: ${(auction.start_price_cents || 0) / 100}</div>
-                        </div>
-                      </td>
-                      <td className="p-2">
-                        <Badge 
-                          variant="outline"
-                          className={auction.payment_status === 'PAID' ? 'border-green-500 text-green-400' : 
-                                   auction.payment_status === 'PENDING' ? 'border-yellow-500 text-yellow-400' : 
-                                   'border-red-500 text-red-400'}
-                        >
-                          {auction.payment_status || 'UNKNOWN'}
-                        </Badge>
-                      </td>
-                      <td className="p-2 text-white">
-                        <div className="text-xs">
-                          <div>{new Date(auction.created_at).toLocaleDateString()}</div>
-                          <div className="text-gray-400">{new Date(auction.created_at).toLocaleTimeString()}</div>
-                        </div>
-                      </td>
-                      <td className="p-2">
-                        <div className="flex gap-1">
-                          {auction.winning_bid && auction.payment_status !== 'PAID' && (
-                            <Button
-                              onClick={() => handleManualPaymentVerification(auction.id)}
-                              size="sm"
-                              className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
-                            >
-                              Verify
-                            </Button>
-                          )}
-                          <Button
-                            onClick={() => {
-                              setSelectedAuction(auction.id)
-                              loadPayoutBreakdown(auction.id)
-                            }}
-                            size="sm"
-                            variant="outline"
-                            className="border-purple-500 text-purple-400 hover:bg-purple-500/20 text-xs"
-                          >
-                            Payout
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            
-            {auctions.length === 0 && (
-              <div className="text-center py-8 text-gray-400">
-                No auctions found in database.
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Receipts Table */}
-      <Card className="bg-gradient-to-br from-slate-800/80 to-purple-800/80 backdrop-blur-sm border border-purple-500/30">
-        <CardHeader>
-          <CardTitle className="text-white">Payment Receipts</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-purple-500/30">
-                  <th className="text-left p-2 text-gray-400">Date</th>
-                  <th className="text-left p-2 text-gray-400">User</th>
-                  <th className="text-left p-2 text-gray-400">Amount</th>
-                  <th className="text-left p-2 text-gray-400">Status</th>
-                  <th className="text-left p-2 text-gray-400">Auction ID</th>
-                  <th className="text-left p-2 text-gray-400">Type</th>
-                </tr>
-              </thead>
-              <tbody>
-                {receipts.map((receipt) => (
-                  <tr key={receipt.id} className="border-b border-purple-500/20 hover:bg-purple-500/10">
-                    <td className="p-2 text-white">
-                      {new Date(receipt.paidAt * 1000).toLocaleDateString()}
-                    </td>
-                    <td className="p-2 text-white">
-                      {receipt.member?.user?.username || 'Unknown'}
-                    </td>
-                    <td className="p-2 text-white font-medium">
-                      {formatCurrency(receipt.settledUsdAmount * 100)}
-                    </td>
-                    <td className="p-2">
-                      <Badge 
-                        variant={receipt.status === 'succeeded' ? 'default' : 'secondary'}
-                        className={receipt.status === 'succeeded' ? 'bg-green-600' : 'bg-gray-600'}
-                      >
-                        {receipt.status}
-                      </Badge>
-                    </td>
-                    <td className="p-2 text-white">
-                      {receipt.metadata?.auctionId || 'N/A'}
-                    </td>
-                    <td className="p-2 text-white">
-                      {receipt.metadata?.type || 'N/A'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          
-          {receipts.length === 0 && (
-            <div className="text-center py-8 text-gray-400">
-              No payment receipts found.
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   )
 }
