@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Send, MessageCircle, Users } from 'lucide-react'
+import { Send, MessageCircle, Users, RefreshCw } from 'lucide-react'
 import { supabaseClient as supabase } from '@/lib/supabase-client'
 
 interface ChatMessage {
@@ -57,11 +57,8 @@ export default function AuctionChat({
     subscribeToMessages()
     
     return () => {
-      if (subscribed) {
-        console.log('Cleaning up subscriptions')
-        // Note: removeAllSubscriptions is not available in current Supabase version
-        // Subscriptions will be cleaned up automatically when component unmounts
-      }
+      console.log('🧹 Cleaning up chat subscriptions')
+      supabase.removeAllChannels()
     }
   }, [auctionId, currentUserId])
 
@@ -123,7 +120,14 @@ export default function AuctionChat({
   }
 
   const subscribeToMessages = () => {
-    console.log('Setting up real-time subscription for auction:', auctionId)
+    console.log('🔌 Setting up real-time subscription for auction:', auctionId)
+    
+    // Clean up any existing subscription
+    if (subscribed) {
+      console.log('🔄 Cleaning up existing subscription')
+      supabase.removeAllChannels()
+    }
+    
     const subscription = supabase
       .channel(`auction-chat-${auctionId}`)
       .on(
@@ -135,14 +139,39 @@ export default function AuctionChat({
           filter: `auction_id=eq.${auctionId}`
         },
         (payload) => {
-          console.log('New message received:', payload)
+          console.log('📨 New message received:', payload)
           const newMessage = payload.new as ChatMessage
-          setMessages(prev => [...prev, newMessage])
+          setMessages(prev => {
+            console.log('📝 Updating messages, current count:', prev.length)
+            return [...prev, newMessage]
+          })
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'auction_chat',
+          filter: `auction_id=eq.${auctionId}`
+        },
+        (payload) => {
+          console.log('📝 Message updated:', payload)
+          const updatedMessage = payload.new as ChatMessage
+          setMessages(prev => 
+            prev.map(msg => msg.id === updatedMessage.id ? updatedMessage : msg)
+          )
         }
       )
       .subscribe((status) => {
-        console.log('Subscription status:', status)
+        console.log('🔌 Subscription status:', status)
         setSubscribed(status === 'SUBSCRIBED')
+        
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Real-time subscription active')
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Real-time subscription failed')
+        }
       })
 
     return subscription
@@ -175,10 +204,16 @@ export default function AuctionChat({
         return
       }
 
-      console.log('Message sent successfully')
+      console.log('✅ Message sent successfully')
       setNewMessage('')
+      
+      // Force refresh messages to ensure real-time update
+      setTimeout(() => {
+        fetchMessages()
+      }, 100)
     } catch (error) {
-      console.error('Error sending message:', error)
+      console.error('❌ Error sending message:', error)
+      alert('Failed to send message. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -209,17 +244,35 @@ export default function AuctionChat({
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <MessageCircle className="h-5 w-5" />
-          Auction Chat
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <Users className="h-4 w-4" />
-            <span>
-              {isWinner && isSeller ? '(You are both winner and seller)' : 
-               isWinner ? '(You won this auction)' : 
-               isSeller ? '(You created this auction)' : 
-               '(Public chat - everyone can participate)'}
-            </span>
+        <CardTitle className="flex items-center justify-between text-lg">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="h-5 w-5" />
+            Auction Chat
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Users className="h-4 w-4" />
+              <span>
+                {isWinner && isSeller ? '(You are both winner and seller)' : 
+                 isWinner ? '(You won this auction)' : 
+                 isSeller ? '(You created this auction)' : 
+                 '(Public chat - everyone can participate)'}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${subscribed ? 'bg-green-500' : 'bg-red-500'}`} 
+                 title={subscribed ? 'Real-time active' : 'Real-time disconnected'} />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                console.log('🔄 Manual refresh triggered')
+                fetchMessages()
+              }}
+              className="h-8 w-8 p-0"
+              title="Refresh messages"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
           </div>
         </CardTitle>
       </CardHeader>
