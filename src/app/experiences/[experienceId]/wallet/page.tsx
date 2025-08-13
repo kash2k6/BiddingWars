@@ -68,12 +68,8 @@ export default function WalletPage({ params }: { params: { experienceId: string 
 
   const handleAddFunds = async () => {
     try {
-      // Open Whop add funds modal
-      const { getIframeSdk } = await import("@/lib/whop-iframe")
-      const sdk = await getIframeSdk()
-      await sdk.openExternalUrl({ 
-        url: "https://whop.com/dashboard/settings/checkout" 
-      })
+      // Open Whop add funds modal - redirect to Whop dashboard
+      window.open("https://whop.com/dashboard/settings/checkout", "_blank")
     } catch (error) {
       console.error('Error opening add funds:', error)
     }
