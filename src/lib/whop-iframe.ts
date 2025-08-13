@@ -1,17 +1,42 @@
-import { createSdk } from "@whop/iframe"
+import { IframeSdk } from '@whop/iframe'
 
-export const iframeSdk = createSdk({
-  appId: process.env.NEXT_PUBLIC_WHOP_APP_ID || 'test-app-id',
-})
+let iframeSdk: IframeSdk | null = null
+
+// Initialize the iframe SDK
+async function getIframeSdk(): Promise<IframeSdk> {
+  if (iframeSdk) {
+    return iframeSdk
+  }
+
+  if (typeof window === 'undefined') {
+    throw new Error('Iframe SDK can only be used in browser environment')
+  }
+
+  try {
+    iframeSdk = new IframeSdk()
+    await iframeSdk.init()
+    console.log('Iframe SDK initialized successfully')
+    return iframeSdk
+  } catch (error) {
+    console.error('Failed to initialize iframe SDK:', error)
+    throw error
+  }
+}
 
 // Function to get iframe context
 export async function getIframeContext() {
   try {
-    console.log("Getting iframe context with SDK...")
-    console.log("App ID:", process.env.NEXT_PUBLIC_WHOP_APP_ID)
-    console.log("Window parent:", typeof window !== 'undefined' ? (window.parent === window ? 'Same window' : 'Different window') : 'No window')
+    console.log('Getting iframe context...')
     
-    // For development with whop-proxy, try to get context from URL params first
+    const sdk = await getIframeSdk()
+    const context = await sdk.getContext()
+    
+    console.log('Iframe context received:', context)
+    return context
+  } catch (error) {
+    console.error('Failed to get iframe context:', error)
+    
+    // For development, if we're using the proxy, try to get context from URL params
     if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
       const urlParams = new URLSearchParams(window.location.search)
       const userId = urlParams.get('userId') || urlParams.get('user_id')
@@ -36,83 +61,74 @@ export async function getIframeContext() {
     const context = await response.json()
     console.log("Context received from server:", context)
     return context
-  } catch (error) {
-    console.error('Failed to get iframe context:', error)
-    
-    // For development, if we're using the proxy, try to get context from URL params
-    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-      const urlParams = new URLSearchParams(window.location.search)
-      const userId = urlParams.get('userId') || urlParams.get('user_id')
-      const experienceId = urlParams.get('experienceId') || urlParams.get('experience_id')
-      
-      if (userId && experienceId) {
-        console.log('Using fallback context from URL params after SDK failure')
-        return {
-          userId,
-          experienceId,
-          companyId: urlParams.get('companyId') || urlParams.get('company_id') || undefined
-        }
-      }
-    }
-    
-    throw error
   }
 }
 
-// Function to create in-app purchase
-export async function createInAppPurchase(paymentData: any) {
+// Function to create in-app purchase using proper Whop iframe SDK
+export async function createInAppPurchase(inAppPurchaseData: any) {
   try {
-    console.log('Processing payment data:', paymentData)
-    console.log('Payment data keys:', Object.keys(paymentData))
+    console.log('Creating in-app purchase with data:', inAppPurchaseData)
     
-    // Extract planId from the payment data (from the charge)
-    const planId = paymentData.charge?.planId || paymentData.planId
-    console.log('Using planId:', planId)
+    const sdk = await getIframeSdk()
     
-    if (!planId) {
-      console.error('No planId found. Payment data:', paymentData)
-      throw new Error('No planId found in payment data')
-    }
+    // Use the proper iframe SDK method for in-app purchases
+    const result = await sdk.inAppPurchase(inAppPurchaseData)
     
-    // Use the planId directly for the checkout URL (as per Whop documentation)
-    const checkoutUrl = `https://whop.com/checkout/${planId}`
-    console.log('Opening checkout URL:', checkoutUrl)
+    console.log('In-app purchase result:', result)
     
-    if (typeof window !== 'undefined') {
-      console.log('Attempting to open payment window...')
-      
-      // Open checkout URL in a new window/tab
-      const paymentWindow = window.open(checkoutUrl, '_blank', 'width=500,height=600,scrollbars=yes,resizable=yes')
-      
-      console.log('Payment window result:', paymentWindow)
-      
-      if (!paymentWindow) {
-        console.error('Failed to open payment window - popup blocked?')
-        throw new Error('Failed to open payment window. Please allow popups and try again.')
-      }
-      
-      console.log('Payment window opened successfully')
-      
+    if (result.status === 'ok') {
       return {
         success: true,
-        chargeId: paymentData.charge?.id || paymentData.id,
-        sessionId: planId,
-        receiptId: planId,
-        paymentUrl: checkoutUrl,
-        paymentWindow: paymentWindow
+        receiptId: result.data.receipt_id,
+        sessionId: result.data.session_id,
+        chargeId: inAppPurchaseData.id,
+        paymentUrl: null,
+        paymentWindow: null
       }
     } else {
-      throw new Error('Not in browser environment')
+      return {
+        success: false,
+        error: result.error || 'In-app purchase failed',
+        chargeId: inAppPurchaseData.id,
+        sessionId: null,
+        receiptId: null
+      }
     }
   } catch (error) {
-    console.error('Failed to open payment:', error)
+    console.error('Failed to create in-app purchase:', error)
     
     return {
       success: false,
-      error: `Failed to open payment: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      chargeId: paymentData?.charge?.id || paymentData?.id,
+      error: `Failed to create in-app purchase: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      chargeId: inAppPurchaseData?.id,
       sessionId: null,
       receiptId: null
     }
+  }
+}
+
+// Function to open purchase modal (alternative method)
+export async function openPurchaseModal(planId: string, options?: {
+  onSuccess?: () => void
+  onError?: (error: any) => void
+  onClose?: () => void
+}) {
+  try {
+    console.log('Opening purchase modal for plan:', planId)
+    
+    const sdk = await getIframeSdk()
+    
+    const result = await sdk.openPurchaseModal({
+      planId,
+      onSuccess: options?.onSuccess,
+      onError: options?.onError,
+      onClose: options?.onClose
+    })
+    
+    console.log('Purchase modal result:', result)
+    return result
+  } catch (error) {
+    console.error('Failed to open purchase modal:', error)
+    throw error
   }
 }

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency } from "@/lib/payouts"
 import { DollarSign, CheckCircle, XCircle, Loader2 } from "lucide-react"
-import { getIframeContext, createInAppPurchase } from "@/lib/whop-client"
+import { getIframeContext, createInAppPurchase, openPurchaseModal } from "@/lib/whop-client"
 
 interface PaymentHandlerProps {
   auctionId: string
@@ -58,31 +58,120 @@ export function PaymentHandler({
       
       if (response.ok) {
         const chargeResult = await response.json()
+        console.log('Charge created successfully:', chargeResult)
         
-        // 2. Use the createInAppPurchase function from whop-client
-        const res = await createInAppPurchase(chargeResult)
+        // 2. Use the proper iframe SDK for in-app purchase
+        const res = await createInAppPurchase(chargeResult.charge)
         
         if (res.success) {
-          // Payment window opened successfully, but payment not completed yet
+          // Payment completed successfully
           setReceiptId(res.receiptId)
-          setPaymentStatus('processing')
+          setPaymentStatus('success')
           setError(undefined)
           
           toast({
-            title: "Payment Window Opened",
-            description: "Please complete your payment in the new window. The auction will be finalized once payment is confirmed.",
+            title: "Payment Successful! 🎉",
+            description: "Your payment has been processed successfully.",
           })
           
-          // Don't call onSuccess yet - wait for actual payment completion
-          // The auction will be finalized through webhooks or manual verification
+          onSuccess?.()
         } else {
           setReceiptId(undefined)
           setPaymentStatus('failed')
-          setError('Payment failed')
-          throw new Error('Payment failed')
+          setError(res.error || 'Payment failed')
+          throw new Error(res.error || 'Payment failed')
         }
       } else {
-        throw new Error("Failed to create charge")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to create charge")
+      }
+    } catch (error) {
+      console.error('Payment error:', error)
+      setPaymentStatus('failed')
+      const errorMessage = error instanceof Error ? error.message : 'Payment failed'
+      setError(errorMessage)
+      
+      toast({
+        title: "Payment Failed",
+        description: errorMessage,
+        variant: "destructive",
+      })
+      
+      onError?.(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Alternative payment method using purchase modal
+  const handlePaymentWithModal = async () => {
+    if (disabled || loading) return
+
+    setLoading(true)
+    setPaymentStatus('processing')
+    setError(undefined)
+
+    try {
+      // Get the current Whop context
+      const context = await getIframeContext()
+
+      // 1. Create charge on server
+      const response = await fetch("/api/charge", {
+        method: "POST",
+        body: JSON.stringify({ 
+          userId: context.userId, 
+          experienceId: context.experienceId,
+          amount: amount,
+          currency: 'usd',
+          metadata: {
+            auctionId: auctionId,
+            type: 'auction_payment'
+          }
+        }),
+      })
+      
+      if (response.ok) {
+        const chargeResult = await response.json()
+        console.log('Charge created successfully:', chargeResult)
+        
+        // 2. Open purchase modal with the plan ID
+        const res = await openPurchaseModal(chargeResult.charge.planId, {
+          onSuccess: () => {
+            setPaymentStatus('success')
+            setError(undefined)
+            
+            toast({
+              title: "Payment Successful! 🎉",
+              description: "Your payment has been processed successfully.",
+            })
+            
+            onSuccess?.()
+          },
+          onError: (error: any) => {
+            console.error('Payment modal error:', error)
+            setPaymentStatus('failed')
+            setError(error?.message || 'Payment failed')
+            
+            toast({
+              title: "Payment Failed",
+              description: error?.message || 'Payment failed',
+              variant: "destructive",
+            })
+            
+            onError?.(error?.message || 'Payment failed')
+          },
+          onClose: () => {
+            console.log('Payment modal closed')
+            if (paymentStatus === 'processing') {
+              setPaymentStatus('idle')
+            }
+          }
+        })
+        
+        console.log('Purchase modal result:', res)
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to create charge")
       }
     } catch (error) {
       console.error('Payment error:', error)
@@ -124,7 +213,7 @@ export function PaymentHandler({
         return (
           <>
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Payment Window Opened
+            Processing Payment...
           </>
         )
       case 'failed':

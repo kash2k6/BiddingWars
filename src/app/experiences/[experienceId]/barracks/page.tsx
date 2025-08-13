@@ -408,12 +408,11 @@ export default function BarracksPage() {
           console.error('Failed to update barracks item with payment info')
         }
 
-        // Now open the payment modal with the new plan_id
-        if (typeof window !== 'undefined' && (window as any).Whop) {
-          const whop = (window as any).Whop
+        // Now open the payment modal with the new plan_id using our updated SDK
+        try {
+          const { openPurchaseModal } = await import('@/lib/whop-client')
           
-          const result = await whop.openPurchaseModal({
-            planId: chargeResult.charge.planId,
+          const result = await openPurchaseModal(chargeResult.charge.planId, {
             onSuccess: () => {
               toast({
                 title: "Payment Successful! 🎉",
@@ -433,7 +432,11 @@ export default function BarracksPage() {
               console.log('Payment modal closed')
             }
           })
-        } else {
+          
+          console.log('Purchase modal result:', result)
+        } catch (error) {
+          console.error('Failed to open purchase modal:', error)
+          
           // Fallback: redirect to Whop purchase page
           const purchaseUrl = `https://whop.com/checkout/${chargeResult.charge.planId}`
           window.open(purchaseUrl, '_blank')

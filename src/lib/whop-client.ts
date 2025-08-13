@@ -82,15 +82,54 @@ export async function getUserLedgerAccount(userId: string) {
   }
 }
 
-// Function to create in-app purchase
-export async function createInAppPurchase(planId: string) {
+// Function to create checkout session (server-side)
+export async function createCheckoutSession(planId: string, metadata?: any) {
   try {
-    // Use the iframe SDK instead of client SDK for in-app purchases
+    const response = await fetch('/api/whop/create-checkout-session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ planId, metadata })
+    })
+    
+    if (!response.ok) {
+      throw new Error('Failed to create checkout session')
+    }
+    
+    const result = await response.json()
+    return result
+  } catch (error) {
+    console.error('Failed to create checkout session:', error)
+    throw error
+  }
+}
+
+// Function to create in-app purchase using proper iframe SDK
+export async function createInAppPurchase(inAppPurchaseData: any) {
+  try {
+    // Use the iframe SDK for in-app purchases
     const { createInAppPurchase: createInAppPurchaseFromSDK } = await import('@/lib/whop-iframe')
-    const result = await createInAppPurchaseFromSDK(planId)
+    const result = await createInAppPurchaseFromSDK(inAppPurchaseData)
     return result
   } catch (error) {
     console.error('Failed to create in-app purchase:', error)
+    throw error
+  }
+}
+
+// Function to open purchase modal (alternative method)
+export async function openPurchaseModal(planId: string, options?: {
+  onSuccess?: () => void
+  onError?: (error: any) => void
+  onClose?: () => void
+}) {
+  try {
+    const { openPurchaseModal: openPurchaseModalFromSDK } = await import('@/lib/whop-iframe')
+    const result = await openPurchaseModalFromSDK(planId, options)
+    return result
+  } catch (error) {
+    console.error('Failed to open purchase modal:', error)
     throw error
   }
 }
