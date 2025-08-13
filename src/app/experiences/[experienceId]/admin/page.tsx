@@ -232,14 +232,25 @@ export default function AdminPage({ params }: { params: { experienceId: string }
 
   const loadAuctions = async (experienceId: string) => {
     try {
-      // Get auctions with barracks items to show payment status
-      const response = await fetch(`/api/admin/auctions-with-payment-status?experienceId=${experienceId}`)
+      // Get ALL auctions data across entire database
+      const response = await fetch(`/api/admin/all-auctions-data`)
       if (response.ok) {
         const data = await response.json()
         setAuctions(data.auctions || [])
+        
+        // Update stats with comprehensive data
+        if (data.statistics) {
+          setStats({
+            totalRevenue: data.statistics.totalRevenue,
+            platformFees: data.statistics.totalRevenue * 0.05, // Estimate 5% platform fee
+            communityFees: data.statistics.totalRevenue * 0.10, // Estimate 10% community fee
+            totalTransactions: data.statistics.paidAuctions,
+            averageTransaction: data.statistics.paidAuctions > 0 ? data.statistics.totalRevenue / data.statistics.paidAuctions : 0
+          })
+        }
       } else {
-        // Fallback to regular auctions endpoint
-        const fallbackResponse = await fetch(`/api/auctions?experienceId=${experienceId}`)
+        // Fallback to experience-specific data
+        const fallbackResponse = await fetch(`/api/admin/auctions-with-payment-status?experienceId=${experienceId}`)
         if (fallbackResponse.ok) {
           const fallbackData = await fallbackResponse.json()
           setAuctions(fallbackData.auctions || [])
@@ -470,8 +481,8 @@ export default function AdminPage({ params }: { params: { experienceId: string }
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      {/* Comprehensive Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
         <Card className="bg-gradient-to-br from-slate-800/80 to-purple-800/80 backdrop-blur-sm border border-purple-500/30">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -528,6 +539,18 @@ export default function AdminPage({ params }: { params: { experienceId: string }
                 <p className="text-2xl font-bold text-white">{formatCurrency(stats.averageTransaction * 100)}</p>
               </div>
               <BarChart3 className="h-8 w-8 text-yellow-400" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-slate-800/80 to-purple-800/80 backdrop-blur-sm border border-purple-500/30">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-400">Total Auctions</p>
+                <p className="text-2xl font-bold text-white">{auctions.length}</p>
+              </div>
+              <Package className="h-8 w-8 text-green-400" />
             </div>
           </CardContent>
         </Card>
@@ -739,18 +762,18 @@ export default function AdminPage({ params }: { params: { experienceId: string }
         </CardContent>
       </Card>
 
-      {/* Auctions Management Section */}
+      {/* Comprehensive Auctions Management Section */}
       <Card className="bg-gradient-to-br from-slate-800/80 to-orange-800/80 backdrop-blur-sm border border-orange-500/30">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
             <Package className="h-5 w-5" />
-            Auctions Management
+            ALL Auctions Management (Entire Database)
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h4 className="text-white font-medium">All Auctions ({auctions.length})</h4>
+              <h4 className="text-white font-medium">All Auctions Across All Experiences ({auctions.length})</h4>
               <Button
                 onClick={() => adminUser?.experienceId && loadAuctions(adminUser.experienceId)}
                 variant="outline"
@@ -758,7 +781,7 @@ export default function AdminPage({ params }: { params: { experienceId: string }
                 className="bg-orange-600 hover:bg-orange-700 text-white"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
+                Refresh All Data
               </Button>
             </div>
             
@@ -767,11 +790,14 @@ export default function AdminPage({ params }: { params: { experienceId: string }
                 <thead>
                   <tr className="border-b border-orange-500/30">
                     <th className="text-left p-2 text-gray-400">Title</th>
+                    <th className="text-left p-2 text-gray-400">Experience</th>
                     <th className="text-left p-2 text-gray-400">Type</th>
                     <th className="text-left p-2 text-gray-400">Status</th>
                     <th className="text-left p-2 text-gray-400">Winner</th>
                     <th className="text-left p-2 text-gray-400">Amount</th>
+                    <th className="text-left p-2 text-gray-400">Bids</th>
                     <th className="text-left p-2 text-gray-400">Payment</th>
+                    <th className="text-left p-2 text-gray-400">Created</th>
                     <th className="text-left p-2 text-gray-400">Actions</th>
                   </tr>
                 </thead>
@@ -779,7 +805,14 @@ export default function AdminPage({ params }: { params: { experienceId: string }
                   {auctions.map((auction) => (
                     <tr key={auction.id} className="border-b border-orange-500/20 hover:bg-orange-500/10">
                       <td className="p-2 text-white font-medium">
-                        {auction.title}
+                        <div className="max-w-xs truncate" title={auction.title}>
+                          {auction.title}
+                        </div>
+                      </td>
+                      <td className="p-2 text-white">
+                        <div className="text-xs">
+                          <div className="font-mono">{auction.experience_id?.slice(-8)}</div>
+                        </div>
                       </td>
                       <td className="p-2">
                         <Badge 
@@ -791,38 +824,52 @@ export default function AdminPage({ params }: { params: { experienceId: string }
                       </td>
                       <td className="p-2">
                         <Badge 
-                          variant={auction.status === 'ACTIVE' ? 'default' : 'secondary'}
-                          className={auction.status === 'ACTIVE' ? 'bg-green-600' : auction.status === 'ENDED' ? 'bg-orange-600' : 'bg-gray-600'}
+                          variant={auction.status === 'LIVE' ? 'default' : 'secondary'}
+                          className={auction.status === 'LIVE' ? 'bg-green-600' : auction.status === 'ENDED' ? 'bg-orange-600' : 'bg-gray-600'}
                         >
                           {auction.status}
                         </Badge>
                       </td>
                       <td className="p-2 text-white">
                         <div className="text-xs">
-                          <div>Winner: {auction.winning_bids?.[0]?.user_id || 'No winner'}</div>
-                          <div className="text-gray-400">Community: {communityOwner?.companyName || 'Unknown'}</div>
+                          <div>Winner: {auction.winner_user_id || auction.winning_bid?.user_id || 'No winner'}</div>
+                          <div className="text-gray-400">Creator: {auction.created_by_user_id?.slice(-8)}</div>
                         </div>
                       </td>
                       <td className="p-2 text-white font-medium">
-                        ${(auction.winning_bids?.[0]?.amount_cents || 0) / 100}
+                        ${(auction.winning_bid?.amount_cents || auction.highest_bid_cents || 0) / 100}
+                      </td>
+                      <td className="p-2 text-white">
+                        <div className="text-xs">
+                          <div>{auction.total_bids || 0} bids</div>
+                          <div className="text-gray-400">Start: ${(auction.start_price_cents || 0) / 100}</div>
+                        </div>
                       </td>
                       <td className="p-2">
                         <Badge 
                           variant="outline"
-                          className={auction.payment_status === 'PAID' ? 'border-green-500 text-green-400' : 'border-yellow-500 text-yellow-400'}
+                          className={auction.payment_status === 'PAID' ? 'border-green-500 text-green-400' : 
+                                   auction.payment_status === 'PENDING' ? 'border-yellow-500 text-yellow-400' : 
+                                   'border-red-500 text-red-400'}
                         >
                           {auction.payment_status || 'UNKNOWN'}
                         </Badge>
                       </td>
+                      <td className="p-2 text-white">
+                        <div className="text-xs">
+                          <div>{new Date(auction.created_at).toLocaleDateString()}</div>
+                          <div className="text-gray-400">{new Date(auction.created_at).toLocaleTimeString()}</div>
+                        </div>
+                      </td>
                       <td className="p-2">
                         <div className="flex gap-1">
-                          {auction.winning_bids?.[0] && auction.payment_status !== 'PAID' && (
+                          {auction.winning_bid && auction.payment_status !== 'PAID' && (
                             <Button
                               onClick={() => handleManualPaymentVerification(auction.id)}
                               size="sm"
                               className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
                             >
-                              Verify Payment
+                              Verify
                             </Button>
                           )}
                           <Button
@@ -846,7 +893,7 @@ export default function AdminPage({ params }: { params: { experienceId: string }
             
             {auctions.length === 0 && (
               <div className="text-center py-8 text-gray-400">
-                No auctions found.
+                No auctions found in database.
               </div>
             )}
           </div>
