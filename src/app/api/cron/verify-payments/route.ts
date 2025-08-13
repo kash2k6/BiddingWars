@@ -152,59 +152,93 @@ export async function POST(request: NextRequest) {
               if (payment.status === 'paid' && payment.paid_at && !payment.refunded_at) {
                 console.log(`✅ Payment confirmed - updating barracks item ${item.id} to PAID`)
                 
-                // Payment confirmed - update barracks item status
-                const { error: updateError } = await supabaseServer
+                // Update barracks item status to PAID
+                const { error: barracksUpdateError } = await supabaseServer
                   .from('barracks_items')
                   .update({
                     status: 'PAID',
-                    paid_at: new Date(payment.paid_at * 1000).toISOString(), // Convert timestamp to ISO
+                    paid_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                   })
                   .eq('id', item.id)
 
-                if (updateError) {
-                  console.error(`❌ Error updating barracks item ${item.id}:`, updateError)
+                if (barracksUpdateError) {
+                  console.error('Failed to update barracks item status:', barracksUpdateError)
                   errors.push(`Failed to update barracks item ${item.id}`)
                   continue
-                } else {
-                  console.log(`✅ Successfully updated barracks item ${item.id} to PAID`)
                 }
 
                 // Update auction status to PAID
-                const { error: auctionError } = await supabaseServer
+                const { error: auctionUpdateError } = await supabaseServer
                   .from('auctions')
                   .update({
                     status: 'PAID',
+                    winner_user_id: item.user_id,
                     updated_at: new Date().toISOString()
                   })
                   .eq('id', item.auction_id)
 
-                if (auctionError) {
-                  console.error(`Error updating auction ${item.auction_id}:`, auctionError)
+                if (auctionUpdateError) {
+                  console.error('Failed to update auction status:', auctionUpdateError)
                   errors.push(`Failed to update auction ${item.auction_id}`)
                   continue
                 }
 
-                // Create winning bid record
+                // Create winning_bid record
                 const { error: winningBidError } = await supabaseServer
                   .from('winning_bids')
                   .insert({
                     auction_id: item.auction_id,
                     user_id: item.user_id,
-                    bid_id: item.auction?.current_bid_id,
                     amount_cents: item.amount_cents,
                     payment_processed: true,
-                    payment_id: item.payment_id
+                    experience_id: item.experience_id
                   })
-                  .single()
 
                 if (winningBidError) {
-                  console.error(`Error creating winning bid for auction ${item.auction_id}:`, winningBidError)
-                  errors.push(`Failed to create winning bid for auction ${item.auction_id}`)
+                  console.error('Failed to create winning_bid record:', winningBidError)
+                  errors.push(`Failed to create winning_bid for auction ${item.auction_id}`)
                   continue
                 }
 
-                console.log(`Payment verified for item ${item.id} - Item now accessible in barracks`)
+                // Send payment confirmation notification
+                try {
+                  const { sendPaymentConfirmedNotification, sendDigitalProductAccessNotification } = await import('@/lib/notifications')
+                  
+                  // Get auction details for notification
+                  const { data: auction } = await supabaseServer
+                    .from('auctions')
+                    .select('title, type')
+                    .eq('id', item.auction_id)
+                    .single()
+
+                  if (auction) {
+                    // Send payment confirmation notification
+                    await sendPaymentConfirmedNotification(
+                      item.user_id,
+                      item.auction_id,
+                      auction.title,
+                      item.experience_id
+                    )
+
+                    // Send digital product access notification if it's a digital item
+                    if (auction.type === 'DIGITAL') {
+                      await sendDigitalProductAccessNotification(
+                        item.user_id,
+                        item.auction_id,
+                        auction.title,
+                        item.experience_id
+                      )
+                    }
+                  }
+                  
+                  console.log('Payment confirmation notifications sent for item:', item.id)
+                } catch (notificationError) {
+                  console.error('Failed to send payment confirmation notifications for item:', item.id, notificationError)
+                  // Don't fail the payment verification for notification errors
+                }
+
+                console.log(`✅ Successfully updated barracks item ${item.id} and auction ${item.auction_id} to PAID status`)
                 verifiedCount++
 
               } else if (payment.status === 'failed' || payment.status === 'canceled' || payment.refunded_at) {

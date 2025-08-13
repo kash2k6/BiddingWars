@@ -190,7 +190,8 @@ export async function POST(request: NextRequest) {
           const { 
             sendAuctionWonNotification, 
             sendAuctionSoldNotification,
-            notifyAuctionEnded
+            notifyAuctionEnded,
+            sendAuctionEndedNoBidsNotification
           } = await import('@/lib/notifications')
           
           // Notify winner

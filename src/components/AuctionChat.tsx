@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Send, MessageCircle } from 'lucide-react'
+import { Send, MessageCircle, Users } from 'lucide-react'
 import { supabaseClient as supabase } from '@/lib/supabase-client'
 
 interface ChatMessage {
@@ -44,10 +44,10 @@ export default function AuctionChat({
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Only show chat if user is winner or seller
-  if (!isWinner && !isSeller) {
-    return null
-  }
+  // Show chat for all users - removed the restriction
+  // if (!isWinner && !isSeller) {
+  //   return null
+  // }
 
   useEffect(() => {
     console.log('Chat component mounted for auction:', auctionId)
@@ -214,12 +214,15 @@ export default function AuctionChat({
         <CardTitle className="flex items-center gap-2 text-lg">
           <MessageCircle className="h-5 w-5" />
           Auction Chat
-          {(isWinner || isSeller) && (
-            <span className="text-sm text-muted-foreground">
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Users className="h-4 w-4" />
+            <span>
               {isWinner && isSeller ? '(You are both winner and seller)' : 
-               isWinner ? '(You won this auction)' : '(You created this auction)'}
+               isWinner ? '(You won this auction)' : 
+               isSeller ? '(You created this auction)' : 
+               '(Public chat - everyone can participate)'}
             </span>
-          )}
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

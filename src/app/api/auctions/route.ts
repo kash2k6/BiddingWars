@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     const auctionStatus = startDate > now ? 'COMING_SOON' : 'LIVE' // Use COMING_SOON for future auctions
 
     // Create auction
-    const { data: auction, error } = await supabaseServer
+    const { data: auction, error: insertError } = await supabaseServer
       .from('auctions')
       .insert({
         experience_id: whopContext.experienceId,
@@ -126,12 +126,38 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    if (error) {
-      console.error('Error creating auction:', error)
+    if (insertError) {
+      console.error('Error creating auction:', insertError)
       return NextResponse.json({ error: 'Failed to create auction' }, { status: 500 })
     }
 
-    return NextResponse.json(auction)
+    // Send new auction notification to community
+    try {
+      const { sendNewAuctionNotification } = await import('@/lib/notifications')
+      
+      await sendNewAuctionNotification(
+        experienceId,
+        auction.id,
+        title,
+        startPriceCents
+      )
+      
+      console.log('New auction notification sent to community')
+    } catch (notificationError) {
+      console.error('Failed to send new auction notification:', notificationError)
+      // Don't fail auction creation for notification errors
+    }
+
+    console.log('Auction created successfully:', auction.id)
+    return NextResponse.json({ 
+      success: true, 
+      auction: {
+        id: auction.id,
+        title: auction.title,
+        start_price_cents: auction.start_price_cents,
+        status: auction.status
+      }
+    })
   } catch (error) {
     console.error('Error in POST /api/auctions:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

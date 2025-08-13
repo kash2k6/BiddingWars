@@ -152,3 +152,123 @@ export async function notifyAuctionEnded(
     }
   }
 }
+
+/**
+ * Send payment confirmation notification to winner
+ */
+export async function sendPaymentConfirmedNotification(
+  winnerUserId: string,
+  auctionId: string,
+  auctionTitle: string,
+  experienceId: string
+) {
+  const title = "✅ Payment Confirmed!"
+  const content = `Your payment for "${auctionTitle}" has been confirmed. Your item is now available!`
+  
+  await sendPushNotification(
+    winnerUserId, 
+    title, 
+    content, 
+    experienceId,
+    `/barracks`
+  )
+}
+
+/**
+ * Send item shipped notification to winner
+ */
+export async function sendItemShippedNotification(
+  winnerUserId: string,
+  auctionId: string,
+  auctionTitle: string,
+  trackingNumber: string,
+  shippingCarrier: string,
+  experienceId: string
+) {
+  const title = "📦 Your item has been shipped!"
+  const content = `"${auctionTitle}" has been shipped via ${shippingCarrier}. Tracking: ${trackingNumber}`
+  
+  await sendPushNotification(
+    winnerUserId, 
+    title, 
+    content, 
+    experienceId,
+    `/barracks`
+  )
+}
+
+/**
+ * Send item received notification to seller
+ */
+export async function sendItemReceivedNotification(
+  sellerUserId: string,
+  auctionId: string,
+  auctionTitle: string,
+  experienceId: string
+) {
+  const title = "📬 Item Delivered!"
+  const content = `The buyer has confirmed receipt of "${auctionTitle}". Transaction complete!`
+  
+  await sendPushNotification(
+    sellerUserId, 
+    title, 
+    content, 
+    experienceId,
+    `/auctions`
+  )
+}
+
+/**
+ * Send digital product access notification to winner
+ */
+export async function sendDigitalProductAccessNotification(
+  winnerUserId: string,
+  auctionId: string,
+  auctionTitle: string,
+  experienceId: string
+) {
+  const title = "🎁 Digital Product Ready!"
+  const content = `Your digital product "${auctionTitle}" is now available for download!`
+  
+  await sendPushNotification(
+    winnerUserId, 
+    title, 
+    content, 
+    experienceId,
+    `/barracks`
+  )
+}
+
+/**
+ * Send auction creation notification to community
+ */
+export async function sendNewAuctionNotification(
+  experienceId: string,
+  auctionId: string,
+  auctionTitle: string,
+  startingPrice: number
+) {
+  const title = "🆕 New Auction Live!"
+  const content = `"${auctionTitle}" is now live! Starting at $${(startingPrice / 100).toFixed(2)}`
+  
+  // Send to all users in the experience
+  try {
+    const whopSdk = WhopServerSdk({
+      appId: process.env.NEXT_PUBLIC_WHOP_APP_ID!,
+      appApiKey: process.env.WHOP_API_KEY!,
+    })
+
+    const result = await whopSdk.notifications.sendPushNotification({
+      title,
+      content,
+      experienceId,
+      restPath: `/auction/${auctionId}`
+    })
+
+    console.log('New auction notification sent to community:', result)
+    return result
+  } catch (error) {
+    console.error('Failed to send new auction notification:', error)
+    throw error
+  }
+}

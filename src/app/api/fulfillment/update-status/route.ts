@@ -189,9 +189,6 @@ export async function POST(request: NextRequest) {
           updated_at: new Date().toISOString()
         })
         .eq('auction_id', auctionId)
-        .select()
-
-      console.log('📦 Barracks update result:', { data: barracksData, error: barracksError })
 
       if (barracksError) {
         console.error('❌ Error updating barracks items:', barracksError)
@@ -199,6 +196,28 @@ export async function POST(request: NextRequest) {
       }
       
       console.log('✅ Barracks items updated successfully')
+
+      // Send shipping notification to winner
+      try {
+        const { sendItemShippedNotification } = await import('@/lib/notifications')
+        
+        await sendItemShippedNotification(
+          auction.winner_user_id!,
+          auctionId,
+          auction.title,
+          trackingNumber,
+          shippingCarrier,
+          auction.experience_id
+        )
+        
+        console.log('Shipping notification sent to winner')
+      } catch (notificationError) {
+        console.error('Failed to send shipping notification:', notificationError)
+        // Don't fail the shipping update for notification errors
+      }
+
+      console.log('✅ Successfully marked item as shipped with tracking info')
+      return NextResponse.json({ success: true, message: 'Item marked as shipped' })
     }
 
     // If marking as received, also update auction status to FULFILLED
@@ -207,6 +226,55 @@ export async function POST(request: NextRequest) {
         .from('auctions')
         .update({ status: 'FULFILLED' })
         .eq('id', auctionId)
+
+      // Update fulfillment status
+      const { error: fulfillmentUpdateError } = await supabaseServer
+        .from('fulfillments')
+        .update({
+          physical_state: 'RECEIVED',
+          updated_at: new Date().toISOString()
+        })
+        .eq('auction_id', auctionId)
+
+      if (fulfillmentUpdateError) {
+        console.error('Failed to update fulfillment:', fulfillmentUpdateError)
+        return NextResponse.json({ error: 'Failed to update fulfillment status' }, { status: 500 })
+      }
+
+      // Update barracks_items status
+      const { error: barracksUpdateError } = await supabaseServer
+        .from('barracks_items')
+        .update({
+          status: 'FULFILLED',
+          received_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('auction_id', auctionId)
+
+      if (barracksUpdateError) {
+        console.error('Failed to update barracks_items:', barracksUpdateError)
+        return NextResponse.json({ error: 'Failed to update item status' }, { status: 500 })
+      }
+
+      // Send received notification to seller
+      try {
+        const { sendItemReceivedNotification } = await import('@/lib/notifications')
+        
+        await sendItemReceivedNotification(
+          auction.created_by_user_id,
+          auctionId,
+          auction.title,
+          auction.experience_id
+        )
+        
+        console.log('Received notification sent to seller')
+      } catch (notificationError) {
+        console.error('Failed to send received notification:', notificationError)
+        // Don't fail the received update for notification errors
+      }
+
+      console.log('✅ Successfully marked item as received')
+      return NextResponse.json({ success: true, message: 'Item marked as received' })
     }
 
     return NextResponse.json({
