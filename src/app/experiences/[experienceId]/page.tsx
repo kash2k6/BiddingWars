@@ -116,7 +116,7 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
           
           // Fetch usernames for past auction winners
           if (pastData && pastData.length > 0) {
-            const uniqueUserIds = [...new Set(pastData.map(auction => auction.winner_user_id).filter(Boolean))]
+            const uniqueUserIds = Array.from(new Set(pastData.map(auction => auction.winner_user_id).filter(Boolean)))
             await fetchUserNames(uniqueUserIds)
           }
         }
