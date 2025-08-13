@@ -18,6 +18,7 @@ interface AuctionCardProps {
     type: 'DIGITAL' | 'PHYSICAL'
     starts_at: string
     ends_at: string
+    anti_snipe_sec: number
     buy_now_price_cents?: number
     start_price_cents: number
     min_increment_cents: number
