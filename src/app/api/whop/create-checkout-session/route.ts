@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       id: result.id,
       planId: result.planId,
-      metadata: result.metadata
+      metadata: metadata // Use the metadata from the request instead
     })
   } catch (error) {
     console.error('Error creating checkout session:', error)
