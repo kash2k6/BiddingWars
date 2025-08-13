@@ -57,14 +57,21 @@ export function AuctionCard({
   const isCreator = auction.created_by_user_id === currentUserId
   const isWinningBid = Boolean(currentBid && currentUserId && currentBids && Object.keys(currentBids).length > 0 && currentBid === Math.max(...Object.values(currentBids)))
 
+  // Calculate the next bid amount
+  // If there's a current bid, next bid = current bid + minimum increment
+  // If no current bid, next bid = start price (first bid)
   const nextBidAmount = currentBid 
     ? currentBid + auction.min_increment_cents 
     : auction.start_price_cents
+
+  // For display purposes, show the current highest bid or start price
+  const displayCurrentBid = currentBid || auction.start_price_cents
 
   // Debug logging for bid calculation
   console.log('AuctionCard bid calculation:', {
     auctionId: auction.id,
     currentBid,
+    displayCurrentBid,
     startPrice: auction.start_price_cents,
     minIncrement: auction.min_increment_cents,
     nextBidAmount,
@@ -141,7 +148,7 @@ export function AuctionCard({
                     <div className="text-center">
                       <p className="text-sm text-gray-400 mb-1">Current Bid</p>
                       <p className="text-2xl font-bold text-white">
-                        {formatCurrency(currentBid || auction.start_price_cents)}
+                        {formatCurrency(displayCurrentBid)}
                       </p>
                     </div>
 
