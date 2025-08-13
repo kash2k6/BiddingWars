@@ -61,6 +61,16 @@ export function AuctionCard({
     ? currentBid + auction.min_increment_cents 
     : auction.start_price_cents
 
+  // Debug logging for bid calculation
+  console.log('AuctionCard bid calculation:', {
+    auctionId: auction.id,
+    currentBid,
+    startPrice: auction.start_price_cents,
+    minIncrement: auction.min_increment_cents,
+    nextBidAmount,
+    hasCurrentBid: !!currentBid
+  })
+
   const canBid = isLive && currentUserId && !isCreator
   const canBuyNow = isLive && auction.buy_now_price_cents && currentUserId && !isCreator
   

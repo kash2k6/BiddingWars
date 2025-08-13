@@ -473,6 +473,14 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
     )
   }
 
+  // Debug logging for marketplace state
+  console.log('Marketplace state:', {
+    auctionsCount: auctions.length,
+    currentBidsCount: Object.keys(currentBids).length,
+    currentBids,
+    loading
+  })
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
       {/* Main Content */}
