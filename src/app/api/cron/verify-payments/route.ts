@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
         auction:auction_id(*)
       `)
       .eq('status', 'PENDING_PAYMENT')
+      .not('plan_id', 'is', null) // Only process items with plan_id
 
     if (fetchError) {
       console.error('Error fetching pending items:', fetchError)
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
 
         // Check if we have a plan_id (new flow) or payment_id (old flow)
         if (item.plan_id && !item.plan_id.startsWith('temp_plan_')) {
-          console.log(`Processing item ${item.id} with plan_id: ${item.plan_id}, amount: ${item.amount_cents} cents`)
+          console.log(`🔍 Processing item ${item.id} with plan_id: ${item.plan_id}, amount: ${item.amount_cents} cents, user: ${item.user_id}`)
           
           // New flow: Query ALL payments and filter by user_id, plan_id, and total amount (bid + shipping)
           try {
@@ -86,11 +87,29 @@ export async function POST(request: NextRequest) {
 
             // Filter payments by: user_id, plan_id, and total amount (bid + shipping)
             if (paymentsData.data && paymentsData.data.length > 0) {
-              const matchingPayments = paymentsData.data.filter((payment: any) => 
-                payment.user_id === item.user_id &&
-                payment.plan_id === item.plan_id &&
-                payment.final_amount === totalAmountDollars
-              )
+              console.log(`🔍 Looking for payment matching: user_id=${item.user_id}, plan_id=${item.plan_id}, amount=$${totalAmountDollars}`)
+              console.log(`📊 Total payments found: ${paymentsData.data.length}`)
+              
+              // Log all payments for debugging
+              paymentsData.data.forEach((payment: any, index: number) => {
+                console.log(`📋 Payment ${index + 1}: id=${payment.id}, user_id=${payment.user_id}, plan_id=${payment.plan_id}, amount=$${payment.final_amount}, status=${payment.status}`)
+              })
+              
+              const matchingPayments = paymentsData.data.filter((payment: any) => {
+                const userMatch = payment.user_id === item.user_id
+                const planMatch = payment.plan_id === item.plan_id
+                const amountMatch = payment.final_amount === totalAmountDollars
+                
+                console.log(`🔍 Payment ${payment.id}: user_match=${userMatch}, plan_match=${planMatch}, amount_match=${amountMatch} (expected: $${totalAmountDollars}, got: $${payment.final_amount})`)
+                
+                const matches = userMatch && planMatch && amountMatch
+                
+                if (matches) {
+                  console.log(`✅ Found matching payment: ${payment.id} (status: ${payment.status})`)
+                }
+                
+                return matches
+              })
               
               console.log(`Found ${matchingPayments.length} payments matching user_id: ${item.user_id}, plan_id: ${item.plan_id}, total amount: $${totalAmountDollars}`)
               console.log('Matching payments:', matchingPayments.map((p: any) => ({ 
@@ -104,7 +123,7 @@ export async function POST(request: NextRequest) {
               })))
               
               if (matchingPayments.length === 0) {
-                console.log(`No payments found for user ${item.user_id}, plan ${item.plan_id}, total amount $${totalAmountDollars} - keeping as pending`)
+                console.log(`❌ No payments found for user ${item.user_id}, plan ${item.plan_id}, total amount $${totalAmountDollars} - keeping as pending`)
                 continue
               }
               
@@ -115,17 +134,24 @@ export async function POST(request: NextRequest) {
                 !p.refunded_at
               )
               
+              console.log(`🔍 Found ${validPayments.length} valid (paid, not refunded) payments out of ${matchingPayments.length} matching payments`)
+              
               if (validPayments.length === 0) {
-                console.log(`No valid (paid, not refunded) payments found - keeping as pending`)
+                console.log(`❌ No valid (paid, not refunded) payments found - keeping as pending`)
                 continue
               }
               
               const payment = validPayments[0] // Get the first valid payment
+              console.log(`✅ Using payment: ${payment.id} for plan ${item.plan_id}, user ${item.user_id}, amount $${payment.final_amount}`)
               console.log(`Payment status for plan ${item.plan_id}: ${payment.status}`)
               
               // Check if payment is successful (API returns "paid" not "succeeded")
               // Also check if it's not refunded
+              console.log(`🔍 Checking payment status: ${payment.status}, paid_at: ${payment.paid_at}, refunded_at: ${payment.refunded_at}`)
+              
               if (payment.status === 'paid' && payment.paid_at && !payment.refunded_at) {
+                console.log(`✅ Payment confirmed - updating barracks item ${item.id} to PAID`)
+                
                 // Payment confirmed - update barracks item status
                 const { error: updateError } = await supabaseServer
                   .from('barracks_items')
@@ -137,9 +163,11 @@ export async function POST(request: NextRequest) {
                   .eq('id', item.id)
 
                 if (updateError) {
-                  console.error(`Error updating barracks item ${item.id}:`, updateError)
+                  console.error(`❌ Error updating barracks item ${item.id}:`, updateError)
                   errors.push(`Failed to update barracks item ${item.id}`)
                   continue
+                } else {
+                  console.log(`✅ Successfully updated barracks item ${item.id} to PAID`)
                 }
 
                 // Update auction status to PAID
