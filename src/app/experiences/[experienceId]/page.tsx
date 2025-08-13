@@ -230,6 +230,9 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-whop-user-token': context.userId,
+          'x-whop-experience-id': context.experienceId,
+          'x-whop-company-id': context.companyId,
         },
         body: JSON.stringify({ 
           amountCents: amount,
