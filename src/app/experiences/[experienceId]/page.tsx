@@ -33,7 +33,9 @@ interface Auction {
 
 export default function MarketplacePage({ params }: { params: { experienceId: string } }) {
   const [auctions, setAuctions] = useState<Auction[]>([])
+  const [pastAuctions, setPastAuctions] = useState<Auction[]>([])
   const [currentBids, setCurrentBids] = useState<Record<string, number>>({})
+  const [userNames, setUserNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null)
@@ -98,6 +100,26 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
           }
         }
         setCurrentBids(bidsData)
+
+        // Also fetch past auctions (all completed auctions with winners)
+        const { data: pastData, error: pastError } = await supabaseClient
+          .from('auctions')
+          .select('*')
+          .eq('experience_id', params.experienceId)
+          .in('status', ['ENDED', 'PAID', 'FULFILLED'])
+          .not('winner_user_id', 'is', null)
+          .order('ends_at', { ascending: false })
+          .limit(10) // Show last 10 past auctions
+
+        if (!pastError) {
+          setPastAuctions(pastData || [])
+          
+          // Fetch usernames for past auction winners
+          if (pastData && pastData.length > 0) {
+            const uniqueUserIds = [...new Set(pastData.map(auction => auction.winner_user_id).filter(Boolean))]
+            await fetchUserNames(uniqueUserIds)
+          }
+        }
       } catch (error) {
         console.error('Error fetching auctions:', error)
         toast({
@@ -324,6 +346,39 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
     }
   }
 
+  const fetchUserNames = async (userIds: string[]) => {
+    try {
+      const newUserNames: Record<string, string> = {}
+      
+      for (const userId of userIds) {
+        if (!userNames[userId]) { // Only fetch if we don't already have it
+          try {
+            const response = await fetch(`/api/whop/user-info?userId=${userId}`)
+            if (response.ok) {
+              const data = await response.json()
+              if (data.success && data.user) {
+                newUserNames[userId] = data.user.username || data.user.name || userId
+              } else {
+                newUserNames[userId] = userId
+              }
+            } else {
+              newUserNames[userId] = userId
+            }
+          } catch (error) {
+            console.error('Error fetching username for user:', userId, error)
+            newUserNames[userId] = userId
+          }
+        }
+      }
+      
+      if (Object.keys(newUserNames).length > 0) {
+        setUserNames(prev => ({ ...prev, ...newUserNames }))
+      }
+    } catch (error) {
+      console.error('Error fetching usernames:', error)
+    }
+  }
+
   const handleMarkReceived = async (auctionId: string) => {
     try {
       const contextResponse = await fetch('/api/whop-context')
@@ -422,6 +477,60 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
             ))}
           </div>
         )}
+
+        {/* Past Auctions Section */}
+        <div className="mt-8">
+          <div className="flex items-center gap-3 mb-4">
+            <h3 className="text-xl font-bold bg-gradient-to-r from-gray-500 to-gray-600 bg-clip-text text-transparent">
+              🏆 PAST AUCTIONS
+            </h3>
+            <Badge variant="secondary" className="bg-gradient-to-r from-gray-500 to-gray-600 text-white font-bold">
+              {pastAuctions.length} COMPLETED
+            </Badge>
+          </div>
+          
+          {pastAuctions.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {pastAuctions.map((auction) => (
+                <div key={auction.id} className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold text-gray-900 text-sm truncate">
+                        {auction.title}
+                      </h4>
+                      <Badge 
+                        variant="outline" 
+                        className="text-xs border-gray-400 text-gray-600"
+                      >
+                        {auction.type}
+                      </Badge>
+                    </div>
+                    
+                    <div className="text-xs text-gray-600 space-y-1">
+                      <p>
+                        <span className="font-medium">Winner:</span> {userNames[auction.winner_user_id || ''] || auction.winner_user_id?.substring(0, 8) + '...' || 'Unknown'}
+                      </p>
+                      <p>
+                        <span className="font-medium">Sold for:</span> {formatCurrency(auction.start_price_cents)}
+                      </p>
+                      <p>
+                        <span className="font-medium">Ended:</span> {new Date(auction.ends_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-lg">
+              <div className="text-4xl mb-4">🏆</div>
+              <h3 className="text-lg font-medium mb-2 text-gray-700">No past auctions yet</h3>
+              <p className="text-gray-500">
+                Be the first to create an auction and make history!
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Sidebar with Live Feed */}

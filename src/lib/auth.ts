@@ -9,10 +9,18 @@ export interface WhopContext {
 
 export async function getWhopUserFromRequest(req: NextRequest): Promise<WhopContext | null> {
   try {
+    console.log('🔍 getWhopUserFromRequest called')
+    
     // Extract user token from headers
     const userToken = req.headers.get('x-whop-user-token')
     const experienceId = req.headers.get('x-whop-experience-id')
     const companyId = req.headers.get('x-whop-company-id')
+
+    console.log('🔍 Headers:', {
+      userToken,
+      experienceId,
+      companyId
+    })
 
     // If we have the required headers, extract user ID from JWT
     if (userToken && experienceId) {
@@ -23,16 +31,22 @@ export async function getWhopUserFromRequest(req: NextRequest): Promise<WhopCont
         try {
           const payload = JSON.parse(Buffer.from(userToken.split('.')[1], 'base64').toString())
           userId = payload.sub
+          console.log('🔍 Extracted userId from JWT:', userId)
         } catch (error) {
           console.log('Failed to parse JWT, using as-is:', userToken)
         }
+      } else {
+        console.log('🔍 Using userToken as userId:', userId)
       }
 
-      return {
+      const context = {
         userId,
         experienceId,
         companyId: companyId || undefined,
       }
+      
+      console.log('🔍 Returning context:', context)
+      return context
     }
 
     // Fallback: Try to get context from the request body or URL

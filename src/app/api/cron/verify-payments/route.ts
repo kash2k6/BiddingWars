@@ -46,9 +46,30 @@ export async function POST(request: NextRequest) {
 
         // Check if we have a plan_id (new flow) or payment_id (old flow)
         if (item.plan_id && !item.plan_id.startsWith('temp_plan_')) {
-          // New flow: Check payments for this plan
+          console.log(`Processing item ${item.id} with plan_id: ${item.plan_id}, amount: ${item.amount_cents} cents`)
+          
+          // New flow: Query ALL payments and filter by user_id, plan_id, and total amount (bid + shipping)
           try {
-            const paymentResponse = await fetch(`https://api.whop.com/v5/app/payments?plan_id=${item.plan_id}&in_app_payments=true`, {
+            // Get auction details to calculate total amount (bid + shipping)
+            const { data: auction, error: auctionError } = await supabaseServer
+              .from('auctions')
+              .select('shipping_cost_cents')
+              .eq('id', item.auction_id)
+              .single()
+
+            if (auctionError) {
+              console.error(`Failed to fetch auction ${item.auction_id}:`, auctionError)
+              continue
+            }
+
+            const shippingCostCents = auction.shipping_cost_cents || 0
+            const totalAmountCents = item.amount_cents + shippingCostCents
+            const totalAmountDollars = totalAmountCents / 100
+
+            console.log(`Item amount: $${item.amount_cents / 100}, Shipping: $${shippingCostCents / 100}, Total: $${totalAmountDollars}`)
+
+            // Get all payments for the user (no plan_id filter since it doesn't work properly)
+            const paymentResponse = await fetch(`https://api.whop.com/v5/app/payments?user_id=${item.user_id}&in_app_payments=true`, {
               headers: {
                 'Authorization': `Bearer ${process.env.WHOP_API_KEY}`,
                 'Content-Type': 'application/json'
@@ -56,26 +77,50 @@ export async function POST(request: NextRequest) {
             })
 
             if (!paymentResponse.ok) {
-              console.error(`Failed to fetch payments for plan ${item.plan_id}: ${paymentResponse.status}`)
+              console.error(`Failed to fetch payments for user ${item.user_id}: ${paymentResponse.status}`)
               continue
             }
 
             const paymentsData = await paymentResponse.json()
-            console.log(`Payments for plan ${item.plan_id}:`, JSON.stringify(paymentsData, null, 2))
+            console.log(`Found ${paymentsData.data?.length || 0} total payments for user ${item.user_id}`)
 
-            // Filter payments to only include payments for THIS specific plan AND user
+            // Filter payments by: user_id, plan_id, and total amount (bid + shipping)
             if (paymentsData.data && paymentsData.data.length > 0) {
-              const planPayments = paymentsData.data.filter((payment: any) => 
-                payment.plan_id === item.plan_id && 
-                payment.user_id === item.user_id
+              const matchingPayments = paymentsData.data.filter((payment: any) => 
+                payment.user_id === item.user_id &&
+                payment.plan_id === item.plan_id &&
+                payment.final_amount === totalAmountDollars
               )
               
-              if (planPayments.length === 0) {
-                console.log(`No payments found for plan ${item.plan_id} and user ${item.user_id} - keeping as pending`)
+              console.log(`Found ${matchingPayments.length} payments matching user_id: ${item.user_id}, plan_id: ${item.plan_id}, total amount: $${totalAmountDollars}`)
+              console.log('Matching payments:', matchingPayments.map((p: any) => ({ 
+                id: p.id, 
+                plan_id: p.plan_id, 
+                user_id: p.user_id, 
+                amount: p.final_amount,
+                status: p.status,
+                paid_at: p.paid_at,
+                refunded_at: p.refunded_at
+              })))
+              
+              if (matchingPayments.length === 0) {
+                console.log(`No payments found for user ${item.user_id}, plan ${item.plan_id}, total amount $${totalAmountDollars} - keeping as pending`)
                 continue
               }
               
-              const payment = planPayments[0] // Get the first payment for this plan and user
+              // Get the most recent payment (or the one that's not refunded)
+              const validPayments = matchingPayments.filter((p: any) => 
+                p.status === 'paid' && 
+                p.paid_at && 
+                !p.refunded_at
+              )
+              
+              if (validPayments.length === 0) {
+                console.log(`No valid (paid, not refunded) payments found - keeping as pending`)
+                continue
+              }
+              
+              const payment = validPayments[0] // Get the first valid payment
               console.log(`Payment status for plan ${item.plan_id}: ${payment.status}`)
               
               // Check if payment is successful (API returns "paid" not "succeeded")

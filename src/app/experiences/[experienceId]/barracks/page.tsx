@@ -118,7 +118,8 @@ export default function BarracksPage() {
           id: item.id,
           auction_id: item.auction_id,
           title: item.title,
-          type: item.auction_type
+          type: item.auction_type,
+          shipping_address: item.shipping_address
         })))
         
         const mappedItems = barracksItems.map(item => ({
@@ -258,6 +259,8 @@ export default function BarracksPage() {
       console.log('Item ID:', itemId)
       console.log('Shipping Address:', shippingAddress)
       console.log('Item ID type:', typeof itemId, 'Value:', itemId)
+      console.log('Context available:', !!context)
+      console.log('Current user ID:', context?.userId)
       
       // If shippingAddress is null, we're clearing the address to allow re-entry
       const updateData = shippingAddress === null 
@@ -266,37 +269,34 @@ export default function BarracksPage() {
       
       console.log('Update data being sent to Supabase:', updateData)
       
-      const { data, error } = await supabaseClient
-        .from('barracks_items')
-        .update(updateData)
-        .eq('id', itemId)
-        .select()
+      console.log('About to call server API with updateData:', updateData)
+      console.log('Using itemId:', itemId)
+      
+      // Use server-side API instead of client-side update
+      const response = await fetch('/api/barracks/update-shipping-address', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          itemId: itemId,
+          shippingAddress: shippingAddress
+        })
+      })
 
-      console.log('Supabase response:', { data, error })
+      const result = await response.json()
+      console.log('Server API response:', result)
 
-      if (error) {
-        console.error('Supabase error:', error)
-        throw error
+      if (!response.ok) {
+        console.error('Server API error:', result)
+        throw new Error(result.error || 'Failed to update shipping address')
       }
 
-      console.log('✅ Supabase update successful!')
-      console.log('Updated data:', data)
+      console.log('✅ Server API update successful!')
+      console.log('Updated data:', result.data)
 
-      // Update local state immediately for better UX
-      setPurchasedItems(prev => {
-        const updated = prev.map(item => 
-          item.id === itemId ? { ...item, shipping_address: shippingAddress } : item
-        )
-        console.log('Updated local state:', updated.find(item => item.id === itemId))
-        return updated
-      })
-      
-      // Force a re-render by updating the state again
-      setTimeout(() => {
-        setPurchasedItems(prev => prev.map(item => 
-          item.id === itemId ? { ...item, shipping_address: shippingAddress } : item
-        ))
-      }, 100)
+      // Reload the data from the database to ensure we have the latest state
+      await loadPurchasedItems()
       
       if (shippingAddress === null) {
         toast({
@@ -659,8 +659,10 @@ function ShippingAddressForm({ onSubmit }: { onSubmit: (address: any) => void })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('🚀 FORM SUBMITTED!')
     console.log('ShippingAddressForm submitting address:', address)
     console.log('Form submitted, calling onSubmit...')
+    console.log('onSubmit function exists:', typeof onSubmit === 'function')
     onSubmit(address)
     console.log('onSubmit called successfully')
     
@@ -884,10 +886,16 @@ function PurchasedItemCard({
               <h4 className="font-semibold">Physical Product</h4>
               
               {!item.shipping_address ? (
-                <ShippingAddressForm 
-                  key={`form-${item.id}`}
-                  onSubmit={(address) => onUpdateShippingAddress(item.id, address)}
-                />
+                <div>
+                  <p className="text-sm text-gray-500 mb-2">🔍 Debug: Rendering shipping form for item {item.id}</p>
+                  <ShippingAddressForm 
+                    key={`form-${item.id}`}
+                    onSubmit={(address) => {
+                      console.log('🎯 onSubmit callback triggered for item:', item.id)
+                      onUpdateShippingAddress(item.id, address)
+                    }}
+                  />
+                </div>
               ) : (
                 <div className="p-3 bg-gray-100 rounded-md">
                   <p className="text-sm text-gray-600 font-medium mb-2">Shipping Address:</p>

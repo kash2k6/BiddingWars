@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { supabaseClient } from "@/lib/supabase-client"
 import { formatCurrency } from "@/lib/payouts"
-import { Package, Clock, CheckCircle, Truck, DollarSign } from "lucide-react"
+import { Package, Clock, CheckCircle, Truck, DollarSign, Trophy } from "lucide-react"
 
 interface Auction {
   id: string
@@ -34,7 +34,18 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
   const router = useRouter()
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [auctions, setAuctions] = useState<Auction[]>([])
+  const [pastAuctions, setPastAuctions] = useState<Auction[]>([])
   const [loading, setLoading] = useState(true)
+  const [shippingForm, setShippingForm] = useState<{
+    auctionId: string | null
+    trackingNumber: string
+    shippingCarrier: string
+  }>({
+    auctionId: null,
+    trackingNumber: '',
+    shippingCarrier: ''
+  })
+  const [showShippingForm, setShowShippingForm] = useState(false)
 
   useEffect(() => {
     async function getContext() {
@@ -93,6 +104,37 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
 
         if (error) throw error
         setAuctions(data || [])
+        
+        // Also fetch past auctions (all completed auctions with winners)
+        const { data: pastData, error: pastError } = await supabaseClient
+          .from('auctions')
+          .select(`
+            id,
+            title,
+            description,
+            type,
+            status,
+            start_price_cents,
+            buy_now_price_cents,
+            starts_at,
+            ends_at,
+            winner_user_id,
+            current_bid_id,
+            created_at,
+            created_by_user_id,
+            bids(
+              amount_cents
+            )
+          `)
+          .eq('experience_id', params.experienceId)
+          .in('status', ['ENDED', 'PAID', 'FULFILLED'])
+          .not('winner_user_id', 'is', null)
+          .order('ends_at', { ascending: false })
+          .limit(10) // Show last 10 past auctions
+
+        if (!pastError) {
+          setPastAuctions(pastData || [])
+        }
       } catch (error) {
         console.error('Error fetching auctions:', error)
       } finally {
@@ -163,36 +205,77 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
     router.push(`/experiences/${params.experienceId}/create?edit=${auctionId}`)
   }
 
-  const handleMarkShipped = async (auctionId: string) => {
+  const handleMarkShipped = (auctionId: string) => {
+    setShippingForm({
+      auctionId,
+      trackingNumber: '',
+      shippingCarrier: ''
+    })
+    setShowShippingForm(true)
+  }
+
+  const handleShippingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    console.log('🚀 Shipping form submitted:', shippingForm)
+    
+    if (!shippingForm.auctionId || !shippingForm.trackingNumber || !shippingForm.shippingCarrier) {
+      alert('Please fill in all shipping details')
+      return
+    }
+
     try {
+      console.log('📞 Fetching user context...')
       const contextResponse = await fetch('/api/whop-context')
+      console.log('📞 Context response status:', contextResponse.status)
+      
       if (!contextResponse.ok) {
         throw new Error('Failed to get user context')
       }
       const context = await contextResponse.json()
+      console.log('📞 User context:', context)
 
-      const response = await fetch('/api/fulfillment/mark-shipped', {
+      const requestBody = {
+        auctionId: shippingForm.auctionId,
+        userId: context.userId,
+        experienceId: context.experienceId,
+        action: 'mark_shipped',
+        trackingNumber: shippingForm.trackingNumber,
+        shippingCarrier: shippingForm.shippingCarrier
+      }
+      
+      console.log('📞 Sending API request:', requestBody)
+      
+      const response = await fetch('/api/fulfillment/update-status', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          auctionId,
-          userId: context.userId,
-          experienceId: context.experienceId,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
+      console.log('📞 API response status:', response.status)
       const result = await response.json()
+      console.log('📞 API response:', result)
 
       if (!response.ok) {
         throw new Error(result.error || 'Failed to mark as shipped')
       }
 
+      console.log('✅ Success! Resetting form and reloading...')
+      
+      // Reset form and hide it
+      setShowShippingForm(false)
+      setShippingForm({
+        auctionId: null,
+        trackingNumber: '',
+        shippingCarrier: ''
+      })
+
       // Refresh the page to update the UI
       window.location.reload()
     } catch (error) {
-      console.error('Error marking as shipped:', error)
+      console.error('❌ Error marking as shipped:', error)
       alert('Failed to mark as shipped: ' + (error instanceof Error ? error.message : 'Unknown error'))
     }
   }
@@ -207,6 +290,71 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
 
   return (
     <div className="space-y-6">
+      {/* Shipping Form Modal */}
+      {showShippingForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4">📦 Add Shipping Details</h3>
+            <form onSubmit={handleShippingSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tracking Number *
+                </label>
+                <input
+                  type="text"
+                  value={shippingForm.trackingNumber}
+                  onChange={(e) => setShippingForm({ ...shippingForm, trackingNumber: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter tracking number"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Shipping Carrier *
+                </label>
+                <select
+                  value={shippingForm.shippingCarrier}
+                  onChange={(e) => setShippingForm({ ...shippingForm, shippingCarrier: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">Select carrier</option>
+                  <option value="USPS">USPS</option>
+                  <option value="FedEx">FedEx</option>
+                  <option value="UPS">UPS</option>
+                  <option value="DHL">DHL</option>
+                  <option value="Amazon">Amazon</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowShippingForm(false)
+                    setShippingForm({
+                      auctionId: null,
+                      trackingNumber: '',
+                      shippingCarrier: ''
+                    })
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Mark as Shipped
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-3xl font-bold bg-gradient-to-r from-green-500 to-teal-600 bg-clip-text text-transparent">
@@ -525,6 +673,64 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Past Auctions Section */}
+      <div className="mt-8">
+        <div className="flex items-center gap-3 mb-4">
+          <h3 className="text-xl font-bold bg-gradient-to-r from-gray-500 to-gray-600 bg-clip-text text-transparent">
+            🏆 PAST AUCTIONS
+          </h3>
+          <Badge variant="secondary" className="bg-gradient-to-r from-gray-500 to-gray-600 text-white font-bold">
+            {pastAuctions.length} COMPLETED
+          </Badge>
+        </div>
+        
+        {pastAuctions.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {pastAuctions.map((auction) => (
+              <Card key={auction.id} className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200">
+                <CardContent className="p-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold text-gray-900 text-sm truncate">
+                        {auction.title}
+                      </h4>
+                      <Badge 
+                        variant="outline" 
+                        className="text-xs border-gray-400 text-gray-600"
+                      >
+                        {auction.type}
+                      </Badge>
+                    </div>
+                    
+                    <div className="text-xs text-gray-600 space-y-1">
+                      <p>
+                        <span className="font-medium">Winner:</span> {auction.winner_user_id?.substring(0, 8)}...
+                      </p>
+                      <p>
+                        <span className="font-medium">Sold for:</span> {formatCurrency(getCurrentBid(auction))}
+                      </p>
+                      <p>
+                        <span className="font-medium">Ended:</span> {new Date(auction.ends_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200">
+            <CardContent className="text-center py-8">
+              <Trophy className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium mb-2 text-gray-700">No past auctions yet</h3>
+              <p className="text-gray-500">
+                Be the first to create an auction and make history!
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   )
 }

@@ -26,7 +26,9 @@ import {
   Download,
   RefreshCw,
   Shield,
-  AlertTriangle
+  AlertTriangle,
+  Send,
+  User
 } from "lucide-react"
 
 interface Receipt {
@@ -70,6 +72,20 @@ export default function AdminPage({ params }: { params: { experienceId: string }
   })
   const [loading, setLoading] = useState(true)
   const [accessDenied, setAccessDenied] = useState(false)
+  
+  // Manual payout state
+  const [payoutRecipient, setPayoutRecipient] = useState('')
+  const [payoutAmount, setPayoutAmount] = useState('')
+  const [payoutNotes, setPayoutNotes] = useState('')
+  const [payoutLoading, setPayoutLoading] = useState(false)
+  
+  // Community owner state
+  const [communityOwner, setCommunityOwner] = useState<any>(null)
+  const [auctions, setAuctions] = useState<any[]>([])
+  const [selectedAuction, setSelectedAuction] = useState('')
+  const [payoutBreakdown, setPayoutBreakdown] = useState<any>(null)
+  const [transferFee, setTransferFee] = useState<any>(null)
+  const [ledgerBalance, setLedgerBalance] = useState<number>(0)
 
   useEffect(() => {
     async function checkAdmin() {
@@ -111,6 +127,12 @@ export default function AdminPage({ params }: { params: { experienceId: string }
           // Load admin data using the company ID from the API response
           if (admin.companyId) {
             await loadReceipts(admin.companyId)
+          }
+          // Load community owner and auctions
+          await loadCommunityOwner(admin.experienceId)
+          await loadAuctions(admin.experienceId)
+          if (admin.companyId) {
+            await loadTransferFee(admin.companyId)
           }
         }
       } catch (error) {
@@ -194,6 +216,176 @@ export default function AdminPage({ params }: { params: { experienceId: string }
     a.download = `bidding-wars-receipts-${new Date().toISOString().split('T')[0]}.csv`
     a.click()
     window.URL.revokeObjectURL(url)
+  }
+
+  const loadCommunityOwner = async (experienceId: string) => {
+    try {
+      const response = await fetch(`/api/get-community-owner?experienceId=${experienceId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setCommunityOwner(data.communityOwner)
+      }
+    } catch (error) {
+      console.error('Error loading community owner:', error)
+    }
+  }
+
+  const loadAuctions = async (experienceId: string) => {
+    try {
+      // Get auctions with barracks items to show payment status
+      const response = await fetch(`/api/admin/auctions-with-payment-status?experienceId=${experienceId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setAuctions(data.auctions || [])
+      } else {
+        // Fallback to regular auctions endpoint
+        const fallbackResponse = await fetch(`/api/auctions?experienceId=${experienceId}`)
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json()
+          setAuctions(fallbackData.auctions || [])
+        }
+      }
+    } catch (error) {
+      console.error('Error loading auctions:', error)
+    }
+  }
+
+  const handleManualPaymentVerification = async (auctionId: string) => {
+    try {
+      const response = await fetch('/api/cron/verify-payments', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.CRON_SECRET_KEY || 'biddingwars876-secret-cron-key-2024'}`
+        }
+      })
+      
+      if (response.ok) {
+        toast({
+          title: "Payment verification triggered",
+          description: "Cron job has been manually executed.",
+        })
+        // Reload auctions to get updated status
+        if (adminUser?.experienceId) {
+          await loadAuctions(adminUser.experienceId)
+        }
+      } else {
+        toast({
+          title: "Verification failed",
+          description: "Failed to trigger payment verification.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to trigger payment verification.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const loadPayoutBreakdown = async (auctionId: string) => {
+    try {
+      const response = await fetch(`/api/get-auction-payout-breakdown?auctionId=${auctionId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setPayoutBreakdown(data)
+      }
+    } catch (error) {
+      console.error('Error loading payout breakdown:', error)
+    }
+  }
+
+  const loadTransferFee = async (companyId: string) => {
+    try {
+      const response = await fetch(`/api/get-transfer-fee?companyId=${companyId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setTransferFee(data.transferFee)
+        // Get USD balance
+        const usdBalance = data.ledgerAccount.balanceCaches.nodes.find(
+          (node: any) => node.currency === 'usd'
+        )
+        setLedgerBalance(usdBalance?.balance || 0)
+      }
+    } catch (error) {
+      console.error('Error loading transfer fee:', error)
+    }
+  }
+
+  const handleManualPayout = async () => {
+    if (!payoutRecipient || !payoutAmount || !adminUser?.experienceId) {
+      toast({
+        title: "Missing information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const amount = parseFloat(payoutAmount)
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: "Invalid amount",
+        description: "Please enter a valid amount greater than 0.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Check if we have enough balance
+    const totalCost = amount + (transferFee?.dollars || 0)
+    if (ledgerBalance < totalCost) {
+      toast({
+        title: "Insufficient funds",
+        description: `You need $${totalCost.toFixed(2)} but only have $${ledgerBalance.toFixed(2)} available.`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    setPayoutLoading(true)
+    try {
+      const response = await fetch('/api/manual-payout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          recipientUserId: payoutRecipient,
+          amount: amount,
+          experienceId: adminUser.experienceId,
+          notes: payoutNotes || `Manual payout to ${payoutRecipient}`
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast({
+          title: "Payout successful",
+          description: result.message,
+        })
+        // Clear form
+        setPayoutRecipient('')
+        setPayoutAmount('')
+        setPayoutNotes('')
+      } else {
+        toast({
+          title: "Payout failed",
+          description: result.error || "Failed to process payout",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Payout failed",
+        description: "An error occurred while processing the payout.",
+        variant: "destructive",
+      })
+    } finally {
+      setPayoutLoading(false)
+    }
   }
 
   if (loading) {
@@ -340,6 +532,326 @@ export default function AdminPage({ params }: { params: { experienceId: string }
           </CardContent>
         </Card>
       </div>
+
+      {/* Manual Payout Section */}
+      <Card className="bg-gradient-to-br from-slate-800/80 to-purple-800/80 backdrop-blur-sm border border-purple-500/30">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Send className="h-5 w-5" />
+            Manual Payout
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Recipient User ID
+              </label>
+              <input
+                type="text"
+                value={payoutRecipient}
+                onChange={(e) => setPayoutRecipient(e.target.value)}
+                placeholder="user_xxxxxxxxx"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Amount (USD)
+              </label>
+              <input
+                type="number"
+                value={payoutAmount}
+                onChange={(e) => setPayoutAmount(e.target.value)}
+                placeholder="10.00"
+                step="0.01"
+                min="0"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Notes (Optional)
+              </label>
+              <input
+                type="text"
+                value={payoutNotes}
+                onChange={(e) => setPayoutNotes(e.target.value)}
+                placeholder="Reason for payout"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+          </div>
+          <div className="mt-4">
+            <Button
+              onClick={handleManualPayout}
+              disabled={payoutLoading || !payoutRecipient || !payoutAmount}
+              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold"
+            >
+              {payoutLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send Payout
+                </>
+              )}
+            </Button>
+          </div>
+          <div className="mt-3 text-sm text-gray-400">
+            <p><strong>Your User ID:</strong> {adminUser?.userId}</p>
+            <p><strong>Company ID:</strong> {adminUser?.companyId || 'None'}</p>
+            <p><strong>Experience ID:</strong> {adminUser?.experienceId}</p>
+            {transferFee && (
+              <div className="mt-3 p-3 bg-blue-900/30 rounded border border-blue-500/30">
+                <p className="text-sm text-blue-300">
+                  <strong>💰 Company Ledger Balance:</strong> ${ledgerBalance.toFixed(2)}
+                </p>
+                <p className="text-sm text-blue-300">
+                  <strong>💸 Transfer Fee:</strong> ${transferFee.dollars.toFixed(2)} per payout
+                </p>
+                            <p className="text-sm text-yellow-300 mt-1">
+              <strong>⚠️ Total Cost:</strong> Amount + ${transferFee.dollars.toFixed(2)} fee
+            </p>
+            <p className="text-sm text-green-300 mt-1">
+              <strong>✅ Minimum Payout:</strong> $1.00 (Whop requirement)
+            </p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Community Owner Info */}
+      {communityOwner && (
+        <Card className="bg-gradient-to-br from-slate-800/80 to-blue-800/80 backdrop-blur-sm border border-blue-500/30">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Community Owner
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-400">Community</p>
+                <p className="text-white font-medium">{communityOwner.companyName}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Owner</p>
+                <p className="text-white font-medium">{communityOwner.ownerUsername || communityOwner.ownerUserId || 'Unknown'}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Auction Payouts Section */}
+      <Card className="bg-gradient-to-br from-slate-800/80 to-green-800/80 backdrop-blur-sm border border-green-500/30">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <DollarSign className="h-5 w-5" />
+            Auction Payouts
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Select Auction
+              </label>
+              <select
+                value={selectedAuction}
+                onChange={(e) => {
+                  setSelectedAuction(e.target.value)
+                  if (e.target.value) {
+                    loadPayoutBreakdown(e.target.value)
+                  } else {
+                    setPayoutBreakdown(null)
+                  }
+                }}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="">Select an auction...</option>
+                {auctions.map((auction) => (
+                  <option key={auction.id} value={auction.id}>
+                    {auction.title} - ${(auction.winning_bids?.[0]?.amount_cents || 0) / 100}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {payoutBreakdown && (
+              <div className="bg-gray-800/50 rounded-lg p-4">
+                <h4 className="text-white font-medium mb-3">Payout Breakdown</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-400">Total Amount</p>
+                    <p className="text-white font-medium">${payoutBreakdown.payoutBreakdown.totalAmount}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Your App Fee</p>
+                    <p className="text-white font-medium">${payoutBreakdown.payoutBreakdown.platformFee}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Seller Payout</p>
+                    <p className="text-white font-medium">${payoutBreakdown.payoutBreakdown.sellerAmount}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Community Owner Payout</p>
+                    <p className="text-white font-medium">${payoutBreakdown.payoutBreakdown.communityOwnerAmount}</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <Button
+                    onClick={() => {
+                      // Execute seller payout
+                      setPayoutRecipient(payoutBreakdown.auction.sellerUserId)
+                      setPayoutAmount(payoutBreakdown.payoutBreakdown.sellerAmount.toString())
+                      setPayoutNotes(`Seller payout for auction ${payoutBreakdown.auction.id}`)
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    size="sm"
+                  >
+                    Pay Seller
+                  </Button>
+                  {communityOwner?.ownerUserId && (
+                    <Button
+                      onClick={() => {
+                        // Execute community owner payout
+                        setPayoutRecipient(communityOwner.ownerUserId)
+                        setPayoutAmount(payoutBreakdown.payoutBreakdown.communityOwnerAmount.toString())
+                        setPayoutNotes(`Community owner payout for auction ${payoutBreakdown.auction.id}`)
+                      }}
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                      size="sm"
+                    >
+                      Pay Community Owner
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Auctions Management Section */}
+      <Card className="bg-gradient-to-br from-slate-800/80 to-orange-800/80 backdrop-blur-sm border border-orange-500/30">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Auctions Management
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h4 className="text-white font-medium">All Auctions ({auctions.length})</h4>
+              <Button
+                onClick={() => adminUser?.experienceId && loadAuctions(adminUser.experienceId)}
+                variant="outline"
+                size="sm"
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-orange-500/30">
+                    <th className="text-left p-2 text-gray-400">Title</th>
+                    <th className="text-left p-2 text-gray-400">Type</th>
+                    <th className="text-left p-2 text-gray-400">Status</th>
+                    <th className="text-left p-2 text-gray-400">Winner</th>
+                    <th className="text-left p-2 text-gray-400">Amount</th>
+                    <th className="text-left p-2 text-gray-400">Payment</th>
+                    <th className="text-left p-2 text-gray-400">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auctions.map((auction) => (
+                    <tr key={auction.id} className="border-b border-orange-500/20 hover:bg-orange-500/10">
+                      <td className="p-2 text-white font-medium">
+                        {auction.title}
+                      </td>
+                      <td className="p-2">
+                        <Badge 
+                          variant="outline"
+                          className={auction.type === 'PHYSICAL' ? 'border-blue-500 text-blue-400' : 'border-green-500 text-green-400'}
+                        >
+                          {auction.type}
+                        </Badge>
+                      </td>
+                      <td className="p-2">
+                        <Badge 
+                          variant={auction.status === 'ACTIVE' ? 'default' : 'secondary'}
+                          className={auction.status === 'ACTIVE' ? 'bg-green-600' : auction.status === 'ENDED' ? 'bg-orange-600' : 'bg-gray-600'}
+                        >
+                          {auction.status}
+                        </Badge>
+                      </td>
+                      <td className="p-2 text-white">
+                        <div className="text-xs">
+                          <div>Winner: {auction.winning_bids?.[0]?.user_id || 'No winner'}</div>
+                          <div className="text-gray-400">Community: {communityOwner?.companyName || 'Unknown'}</div>
+                        </div>
+                      </td>
+                      <td className="p-2 text-white font-medium">
+                        ${(auction.winning_bids?.[0]?.amount_cents || 0) / 100}
+                      </td>
+                      <td className="p-2">
+                        <Badge 
+                          variant="outline"
+                          className={auction.payment_status === 'PAID' ? 'border-green-500 text-green-400' : 'border-yellow-500 text-yellow-400'}
+                        >
+                          {auction.payment_status || 'UNKNOWN'}
+                        </Badge>
+                      </td>
+                      <td className="p-2">
+                        <div className="flex gap-1">
+                          {auction.winning_bids?.[0] && auction.payment_status !== 'PAID' && (
+                            <Button
+                              onClick={() => handleManualPaymentVerification(auction.id)}
+                              size="sm"
+                              className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
+                            >
+                              Verify Payment
+                            </Button>
+                          )}
+                          <Button
+                            onClick={() => {
+                              setSelectedAuction(auction.id)
+                              loadPayoutBreakdown(auction.id)
+                            }}
+                            size="sm"
+                            variant="outline"
+                            className="border-purple-500 text-purple-400 hover:bg-purple-500/20 text-xs"
+                          >
+                            Payout
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {auctions.length === 0 && (
+              <div className="text-center py-8 text-gray-400">
+                No auctions found.
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Receipts Table */}
       <Card className="bg-gradient-to-br from-slate-800/80 to-purple-800/80 backdrop-blur-sm border border-purple-500/30">
