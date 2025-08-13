@@ -59,10 +59,10 @@ export function AuctionCard({
 
   // Calculate the next bid amount
   // If there's a current bid, next bid = current bid + minimum increment
-  // If no current bid, next bid = start price (first bid)
+  // If no current bid, next bid = start price + minimum increment (first bid)
   const nextBidAmount = currentBid 
     ? currentBid + auction.min_increment_cents 
-    : auction.start_price_cents
+    : auction.start_price_cents + auction.min_increment_cents
 
   // For display purposes, show the current highest bid or start price
   const displayCurrentBid = currentBid || auction.start_price_cents

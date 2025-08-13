@@ -47,12 +47,17 @@ export async function POST(
     // Validate the bid
     const validation = await validateBid(params.id, amountCents, whopContext.userId)
     
+    console.log('🎯 Bid validation result:', validation)
+    
     if (!validation.isValid) {
+      console.log('❌ Bid validation failed:', validation.error)
       return NextResponse.json({ 
         error: validation.error,
         nextMinAmount: validation.nextMinAmount 
       }, { status: 400 })
     }
+
+    console.log('✅ Bid validation passed, placing bid...')
 
     // Place the bid
     const { data: bid, error: bidError } = await supabaseServer

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { getWhopContext } from "@/lib/whop-context"
 import { getIframeContext, createInAppPurchase } from "@/lib/whop-client"
 import { AuctionCard } from "@/components/AuctionCard"
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { supabaseClient } from "@/lib/supabase-client"
 import { formatCurrency } from "@/lib/payouts"
 import { useToast } from "@/hooks/use-toast"
+import { useFilters } from "@/lib/filter-context"
 
 interface Auction {
   id: string
@@ -40,6 +41,7 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null)
   const { toast } = useToast()
+  const { filters } = useFilters()
 
   useEffect(() => {
     async function getContext() {
@@ -216,6 +218,42 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
       supabaseClient.removeChannel(channel)
     }
   }, [auctions])
+
+  // Filter auctions based on current filters
+  const filteredAuctions = useMemo(() => {
+    return auctions.filter(auction => {
+      // Search filter
+      if (filters.searchTerm && !auction.title.toLowerCase().includes(filters.searchTerm.toLowerCase()) && 
+          !auction.description.toLowerCase().includes(filters.searchTerm.toLowerCase())) {
+        return false
+      }
+
+      // Type filter
+      if (filters.filterType !== 'all' && auction.type !== filters.filterType.toUpperCase()) {
+        return false
+      }
+
+      // Price range filter
+      if (filters.filterPriceRange !== 'all') {
+        const currentBid = currentBids[auction.id] || auction.start_price_cents
+        const priceInDollars = currentBid / 100
+
+        switch (filters.filterPriceRange) {
+          case 'low':
+            if (priceInDollars >= 10) return false
+            break
+          case 'medium':
+            if (priceInDollars < 10 || priceInDollars > 50) return false
+            break
+          case 'high':
+            if (priceInDollars <= 50) return false
+            break
+        }
+      }
+
+      return true
+    })
+  }, [auctions, currentBids, filters])
 
   const handleBid = async (auctionId: string, amount: number) => {
     try {
@@ -499,7 +537,7 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
             </div>
           </div>
           <Badge variant="secondary" className="bg-gradient-to-r from-orange-500 to-red-600 text-white font-bold">
-            {auctions.length} ACTIVE AUCTIONS
+            {filteredAuctions.length} ACTIVE AUCTIONS
           </Badge>
         </div>
 
@@ -517,7 +555,7 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {auctions.map((auction) => {
+            {filteredAuctions.map((auction) => {
               console.log('Marketplace rendering AuctionCard:', {
                 auctionId: auction.id,
                 currentBid: currentBids[auction.id],

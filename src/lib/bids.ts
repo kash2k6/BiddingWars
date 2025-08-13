@@ -12,6 +12,8 @@ export async function validateBid(
   currentUserId: string
 ): Promise<BidValidationResult> {
   try {
+    console.log('🔍 Validating bid:', { auctionId, bidAmount, currentUserId })
+    
     // Get auction details
     const { data: auction, error: auctionError } = await supabaseServer
       .from('auctions')
@@ -20,8 +22,17 @@ export async function validateBid(
       .single()
 
     if (auctionError || !auction) {
+      console.log('❌ Auction not found:', auctionError)
       return { isValid: false, error: 'Auction not found' }
     }
+
+    console.log('📋 Auction details:', {
+      id: auction.id,
+      status: auction.status,
+      startPrice: auction.start_price_cents,
+      minIncrement: auction.min_increment_cents,
+      endsAt: auction.ends_at
+    })
 
     // Check if auction is live
     if (auction.status !== 'LIVE') {
@@ -45,8 +56,17 @@ export async function validateBid(
     const currentTopBid = topBid?.amount_cents || auction.start_price_cents
     const minIncrement = auction.min_increment_cents
 
+    console.log('💰 Bid validation details:', {
+      currentTopBid,
+      minIncrement,
+      bidAmount,
+      requiredMinBid: currentTopBid + minIncrement,
+      hasTopBid: !!topBid
+    })
+
     // Check if bid meets minimum increment
     if (bidAmount <= currentTopBid) {
+      console.log('❌ Bid too low - must be higher than current bid')
       return { 
         isValid: false, 
         error: 'Bid must be higher than current bid',
@@ -56,12 +76,15 @@ export async function validateBid(
 
     // Check if bid meets minimum increment requirement
     if (bidAmount < currentTopBid + minIncrement) {
+      console.log('❌ Bid too low - must meet minimum increment')
       return { 
         isValid: false, 
         error: `Bid must be at least $${(minIncrement / 100).toFixed(2)} higher`,
         nextMinAmount: currentTopBid + minIncrement
       }
     }
+
+    console.log('✅ Bid validation passed!')
 
     // Check anti-snipe logic
     const timeUntilEnd = new Date(auction.ends_at).getTime() - new Date().getTime()
