@@ -80,6 +80,35 @@ export default function BarracksPage() {
     }
   }, [searchParams, toast])
 
+  // Check for payment success message in URL
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const paymentSuccess = urlParams.get('payment_success')
+      const paymentType = urlParams.get('type')
+      
+      if (paymentSuccess === 'true') {
+        if (paymentType === 'buy_now') {
+          toast({
+            title: "🎉 Buy Now Purchase Successful!",
+            description: "Your item has been purchased and will be available shortly once payment is verified.",
+          })
+        } else {
+          toast({
+            title: "✅ Payment Successful!",
+            description: "Your payment has been processed. The item will be available shortly once verified.",
+          })
+        }
+        
+        // Clean up the URL
+        const newUrl = new URL(window.location.href)
+        newUrl.searchParams.delete('payment_success')
+        newUrl.searchParams.delete('type')
+        window.history.replaceState({}, '', newUrl.toString())
+      }
+    }
+  }, [toast])
+
   const loadPurchasedItems = async () => {
     try {
       const iframeContext = await getIframeContext()

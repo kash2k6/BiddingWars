@@ -70,6 +70,47 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
     getContext()
   }, [])
 
+  // Check for payment success message in URL
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const paymentSuccess = urlParams.get('payment_success')
+      const paymentType = urlParams.get('type')
+      const auctionId = urlParams.get('auctionId')
+      
+      if (paymentSuccess === 'true') {
+        if (paymentType === 'auction_win') {
+          toast({
+            title: "🎉 Auction Won!",
+            description: "Congratulations! You won the auction. Your payment is being processed.",
+          })
+        } else if (paymentType === 'auction_payment') {
+          toast({
+            title: "✅ Payment Successful!",
+            description: "Your auction payment has been processed. The item will be available shortly once verified.",
+          })
+        } else if (paymentType === 'buy_now_purchase') {
+          toast({
+            title: "🎉 Buy Now Purchase Successful!",
+            description: "Your item has been purchased and will be available shortly once payment is verified.",
+          })
+        } else {
+          toast({
+            title: "✅ Payment Successful!",
+            description: "Your payment has been processed. The item will be available shortly once verified.",
+          })
+        }
+        
+        // Clean up the URL
+        const newUrl = new URL(window.location.href)
+        newUrl.searchParams.delete('payment_success')
+        newUrl.searchParams.delete('type')
+        newUrl.searchParams.delete('auctionId')
+        window.history.replaceState({}, '', newUrl.toString())
+      }
+    }
+  }, [toast])
+
   useEffect(() => {
     async function fetchAuctions() {
       try {

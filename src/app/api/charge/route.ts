@@ -24,13 +24,17 @@ export async function POST(request: NextRequest) {
     const amountInDollars = amount / 100
     console.log('Converting amount from cents to dollars:', { cents: amount, dollars: amountInDollars })
 
-    // Only use redirect URL for production (not localhost)
-    const isLocalhost = process.env.NEXT_PUBLIC_APP_URL?.includes('localhost') || !process.env.NEXT_PUBLIC_APP_URL
+    // Use deep linking to the main app page
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://bidding-wars-cyowxb5ih-kash2k6s-projects.vercel.app'
+    const redirectUrl = `${baseUrl}/experiences/${experienceId}?payment_success=true&type=${metadata?.type || 'payment'}&auctionId=${metadata?.auctionId || ''}`
+
+    console.log('Using deep link redirect URL:', redirectUrl)
     
     const chargeParams: any = {
       amount: amountInDollars,
       currency: currency,
       userId: actualUserId,
+      redirectUrl: redirectUrl,
       // metadata is information that you'd like to receive later about the payment.
       metadata: {
         experienceId: experienceId,
@@ -38,11 +42,6 @@ export async function POST(request: NextRequest) {
         type: metadata?.type,
         ...metadata
       },
-    }
-
-    // Only add redirect URL for production
-    if (!isLocalhost) {
-      chargeParams.redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL}/experiences/${experienceId}/barracks?payment_success=true`
     }
 
     const result = await whopSdk.payments.chargeUser(chargeParams)

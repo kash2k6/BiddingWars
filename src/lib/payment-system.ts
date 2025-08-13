@@ -89,6 +89,7 @@ export async function chargeUserForAuction(paymentRequest: PaymentRequest): Prom
       currency: paymentRequest.currency as any,
       userId: paymentRequest.userId,
       description: paymentRequest.description,
+      redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://bidding-wars-cyowxb5ih-kash2k6s-projects.vercel.app'}/experiences/${paymentRequest.metadata.experienceId}?payment_success=true&type=payment&auctionId=${paymentRequest.metadata.auctionId}`,
       metadata: paymentRequest.metadata,
     })
 

@@ -117,6 +117,7 @@ export async function POST(
       currency: 'usd' as any,
       userId: actualUserId,
       description: paymentDescription,
+      redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://bidding-wars-cyowxb5ih-kash2k6s-projects.vercel.app'}/experiences/${experienceId}?payment_success=true&type=auction_win&auctionId=${params.id}`,
       metadata: {
         auctionId: params.id,
         experienceId,

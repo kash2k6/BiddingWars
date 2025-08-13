@@ -110,6 +110,7 @@ export async function POST(request: NextRequest) {
           currency: 'usd' as any,
           userId: topBid.bidder_user_id,
           description: `Payment for auction: ${auction.title}`,
+          redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://bidding-wars-cyowxb5ih-kash2k6s-projects.vercel.app'}/experiences/${auction.experience_id}?payment_success=true&type=auction_payment&auctionId=${auction.id}`,
           metadata: {
             auctionId: auction.id,
             experienceId: auction.experience_id,
@@ -130,6 +131,7 @@ export async function POST(request: NextRequest) {
         // Create checkout session for the winner
         const checkoutSession = await whopSdk.payments.createCheckoutSession({
           planId: chargeResult.inAppPurchase.planId,
+          redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://bidding-wars-cyowxb5ih-kash2k6s-projects.vercel.app'}/experiences/${auction.experience_id}?payment_success=true&type=auction_payment&auctionId=${auction.id}`,
           metadata: {
             auctionId: auction.id,
             experienceId: auction.experience_id,
