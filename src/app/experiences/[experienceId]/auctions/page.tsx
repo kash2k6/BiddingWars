@@ -22,6 +22,7 @@ interface Auction {
   buy_now_price_cents?: number
   starts_at: string
   ends_at: string
+  anti_snipe_sec: number
   winner_user_id?: string
   current_bid_id?: string
   created_at: string
