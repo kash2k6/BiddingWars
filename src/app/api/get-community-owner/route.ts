@@ -31,10 +31,8 @@ export async function GET(request: NextRequest) {
         experienceId: experience.id,
         experienceTitle: experience.name,
         companyId: experience.company.id,
-        companyName: experience.company.title,
-        // The community owner is the company owner
-        ownerUserId: experience.company.owner?.id || null,
-        ownerUsername: experience.company.owner?.username || null
+        companyName: experience.company.title
+        // Note: Owner information not available in current API response
       }
     })
 
