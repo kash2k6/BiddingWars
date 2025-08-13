@@ -75,7 +75,8 @@ export function AuctionCard({
     startPrice: auction.start_price_cents,
     minIncrement: auction.min_increment_cents,
     nextBidAmount,
-    hasCurrentBid: !!currentBid
+    hasCurrentBid: !!currentBid,
+    currentBidsObject: currentBids
   })
 
   const canBid = isLive && currentUserId && !isCreator

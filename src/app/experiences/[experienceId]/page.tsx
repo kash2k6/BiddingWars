@@ -514,18 +514,26 @@ export default function MarketplacePage({ params }: { params: { experienceId: st
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {auctions.map((auction) => (
-              <AuctionCard
-                key={auction.id}
-                auction={auction}
-                currentBid={currentBids[auction.id]}
-                currentBids={currentBids}
-                onBid={handleBid}
-                onBuyNow={handleBuyNow}
-                onMarkReceived={handleMarkReceived}
-                currentUserId={currentUserId || undefined}
-              />
-            ))}
+            {auctions.map((auction) => {
+              console.log('Marketplace rendering AuctionCard:', {
+                auctionId: auction.id,
+                currentBid: currentBids[auction.id],
+                hasCurrentBid: !!currentBids[auction.id],
+                startPrice: auction.start_price_cents
+              })
+              return (
+                <AuctionCard
+                  key={auction.id}
+                  auction={auction}
+                  currentBid={currentBids[auction.id]}
+                  currentBids={currentBids}
+                  onBid={handleBid}
+                  onBuyNow={handleBuyNow}
+                  onMarkReceived={handleMarkReceived}
+                  currentUserId={currentUserId || undefined}
+                />
+              )
+            })}
           </div>
         )}
 
