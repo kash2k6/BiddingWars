@@ -1,194 +1,174 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
-import { processPayouts, calculateCommissionBreakdown } from '@/lib/payment-system'
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Webhook received from Whop')
-    
-    const event = await request.json()
-    console.log('Webhook event:', JSON.stringify(event, null, 2))
+    const body = await request.text()
+    const signature = request.headers.get('whop-signature')
 
-    // Verify webhook signature (you should implement this)
-    // const signature = request.headers.get('whop-signature')
-    // if (!verifyWebhookSignature(signature, event)) {
-    //   return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    if (!signature) {
+      console.error('No webhook signature found')
+      return NextResponse.json({ error: 'No signature' }, { status: 400 })
+    }
+
+    // TODO: Implement webhook signature verification
+    // const isValid = verifyWebhookSignature(signature, body)
+    // if (!isValid) {
+    //   return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
     // }
 
-    if (event.type === 'payment.succeeded') {
-      await handlePaymentSucceeded(event.data)
-    } else if (event.type === 'payment.failed') {
-      await handlePaymentFailed(event.data)
-    } else if (event.type === 'refund.updated') {
-      await handleRefundUpdated(event.data)
+    const event = JSON.parse(body)
+    console.log('Webhook event received:', event)
+
+    // Handle payment.succeeded events
+    if (event.event === 'payment.succeeded') {
+      await handlePaymentSucceeded(event)
     }
 
     return NextResponse.json({ received: true })
   } catch (error) {
-    console.error('Error processing webhook:', error)
+    console.error('Webhook error:', error)
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 })
   }
 }
 
-async function handlePaymentSucceeded(paymentData: any) {
+async function handlePaymentSucceeded(event: any) {
   try {
-    console.log('Processing payment succeeded:', paymentData)
+    console.log('Processing payment.succeeded event:', event)
 
-    const { auctionId, experienceId, type } = paymentData.metadata || {}
+    const { 
+      receipt_id, 
+      final_amount, 
+      amount_after_fees, 
+      currency, 
+      user_id, 
+      metadata 
+    } = event.data
 
-    if (!auctionId || type !== 'auction_payment') {
-      console.log('No auction ID or wrong type in payment metadata')
-      return
-    }
-
-    // Get auction details
-    const { data: auction, error: auctionError } = await supabaseServer
-      .from('auctions')
-      .select('*')
-      .eq('id', auctionId)
-      .single()
-
-    if (auctionError || !auction) {
-      console.error('Error fetching auction:', auctionError)
-      return
-    }
-
-    // Update auction status to PAID
-    const { error: updateError } = await supabaseServer
-      .from('auctions')
-      .update({
-        status: 'PAID',
-        payment_id: paymentData.id,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', auctionId)
-
-    if (updateError) {
-      console.error('Error updating auction status:', updateError)
-      return
-    }
-
-    // Calculate commission breakdown
-    const breakdown = calculateCommissionBreakdown(
-      paymentData.amount,
-      auction.platform_pct,
-      auction.community_pct
-    )
-
-    // Process payouts
-    try {
-      // Get the experience to find the company ID for payouts
-      const { WhopServerSdk } = await import('@whop/api')
+    // Handle auction win payments (when someone wins an auction and pays)
+    // Also handle "Buy It Now" payments
+    if ((metadata?.type === 'auction_win' || metadata?.type === 'buy_now') && metadata?.auctionId) {
+      const paymentType = metadata.type === 'buy_now' ? 'Buy It Now' : 'Auction Win'
+      console.log(`Processing ${paymentType} payment for auction:`, metadata.auctionId)
       
-      // Create a fresh SDK instance without onBehalfOfUserId to get experience details
-      const experienceSdk = WhopServerSdk({
-        appId: process.env.NEXT_PUBLIC_WHOP_APP_ID!,
-        appApiKey: process.env.WHOP_API_KEY!,
-      })
-      
-      const experience = await experienceSdk.experiences.getExperience({ 
-        experienceId: experienceId 
-      })
-      const companyId = experience.company.id
-      const companyName = experience.company.title
-      const communityOwnerId = auction.created_by_user_id
+      // Find the barracks item for this auction and user
+      const { data: barracksItem, error: findError } = await supabaseServer
+        .from('barracks_items')
+        .select('*')
+        .eq('auction_id', metadata.auctionId)
+        .eq('user_id', user_id)
+        .eq('status', 'PENDING_PAYMENT')
+        .single()
 
-      console.log('Processing payouts for company:', companyId, 'name:', companyName, 'owner:', communityOwnerId)
-
-      const payoutResult = await processPayouts(
-        auctionId,
-        breakdown,
-        communityOwnerId,
-        auction.created_by_user_id,
-        experienceId
-      )
-
-      if (!payoutResult.success) {
-        console.error('Payout errors:', payoutResult.errors)
-      } else {
-        console.log('Payouts processed successfully')
+      if (findError || !barracksItem) {
+        console.error(`Could not find barracks item for ${paymentType} payment:`, findError)
+        return
       }
-    } catch (payoutError) {
-      console.error('Error processing payouts:', payoutError)
+
+      // Update the barracks item to mark it as paid
+      const { error: updateError } = await supabaseServer
+        .from('barracks_items')
+        .update({
+          status: 'PAID',
+          paid_at: new Date().toISOString(),
+          payment_receipt_id: receipt_id,
+          amount_received_cents: amount_after_fees * 100 // Convert to cents
+        })
+        .eq('id', barracksItem.id)
+
+      if (updateError) {
+        console.error(`Error updating barracks item for ${paymentType}:`, updateError)
+        return
+      }
+
+      console.log(`Successfully updated barracks item for ${paymentType}:`, barracksItem.id)
+
+      // Also update the auction status to PAID
+      const { error: auctionUpdateError } = await supabaseServer
+        .from('auctions')
+        .update({
+          status: 'PAID',
+          winner_user_id: user_id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', metadata.auctionId)
+
+      if (auctionUpdateError) {
+        console.error('Error updating auction status:', auctionUpdateError)
+      }
+
+      // Create winning_bid record if it doesn't exist
+      const { error: winningBidError } = await supabaseServer
+        .from('winning_bids')
+        .upsert({
+          auction_id: metadata.auctionId,
+          user_id: user_id,
+          amount_cents: barracksItem.amount_cents,
+          payment_processed: true,
+          experience_id: barracksItem.experience_id
+        }, {
+          onConflict: 'auction_id'
+        })
+
+      if (winningBidError) {
+        console.error('Error creating/updating winning_bid record:', winningBidError)
+      }
+
+      // Process payouts to seller and community owner
+      try {
+        const { processPayouts, calculateCommissionBreakdown } = await import('@/lib/payment-system')
+        
+        // Get auction details for payout calculation
+        const { data: auction, error: auctionError } = await supabaseServer
+          .from('auctions')
+          .select('created_by_user_id, platform_pct, community_pct, experience_id')
+          .eq('id', metadata.auctionId)
+          .single()
+
+        if (auctionError || !auction) {
+          console.error('Failed to fetch auction for payout:', auctionError)
+        } else {
+          // Calculate commission breakdown using your system
+          const breakdown = calculateCommissionBreakdown(
+            amount_after_fees * 100, // Convert to cents
+            auction.platform_pct || 3, // Default 3% platform fee
+            auction.community_pct || 5  // Default 5% community fee
+          )
+
+          // For now, use the experience ID as community owner
+          const communityOwnerId = auction.experience_id
+
+          console.log(`Processing payouts for ${paymentType}:`, {
+            auctionId: metadata.auctionId,
+            breakdown,
+            sellerId: auction.created_by_user_id,
+            communityOwnerId
+          })
+
+          // Process payouts to seller and community owner
+          const payoutResult = await processPayouts(
+            metadata.auctionId,
+            breakdown,
+            communityOwnerId,
+            auction.created_by_user_id,
+            auction.experience_id
+          )
+
+          if (payoutResult.success) {
+            console.log(`✅ ${paymentType} payouts processed successfully`)
+          } else {
+            console.error(`❌ ${paymentType} payout errors:`, payoutResult.errors)
+          }
+        }
+      } catch (payoutError) {
+        console.error(`Failed to process ${paymentType} payouts:`, payoutError)
+      }
+
+      // TODO: Send push notification when notification API is properly configured
+      console.log(`Payment confirmed for ${paymentType}. User: ${user_id}, Auction: ${metadata.auctionId}`)
     }
 
-    // Create fulfillment record
-    const { error: fulfillmentError } = await supabaseServer
-      .from('fulfillments')
-      .insert({
-        auction_id: auctionId,
-        physical_state: auction.type === 'PHYSICAL' ? 'PENDING_SHIP' : null,
-        dispute_state: 'NONE'
-      })
-
-    if (fulfillmentError) {
-      console.error('Error creating fulfillment record:', fulfillmentError)
-    }
-
-    console.log('Payment succeeded processing completed')
   } catch (error) {
-    console.error('Error handling payment succeeded:', error)
-  }
-}
-
-async function handlePaymentFailed(paymentData: any) {
-  try {
-    console.log('Processing payment failed:', paymentData)
-
-    const { auctionId } = paymentData.metadata || {}
-
-    if (!auctionId) {
-      console.log('No auction ID in payment metadata')
-      return
-    }
-
-    // Update auction status back to LIVE
-    const { error: updateError } = await supabaseServer
-      .from('auctions')
-      .update({
-        status: 'LIVE',
-        winner_user_id: null,
-        current_bid_id: null,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', auctionId)
-
-    if (updateError) {
-      console.error('Error updating auction status:', updateError)
-    }
-
-    console.log('Payment failed processing completed')
-  } catch (error) {
-    console.error('Error handling payment failed:', error)
-  }
-}
-
-async function handleRefundUpdated(refundData: any) {
-  try {
-    console.log('Processing refund updated:', refundData)
-
-    const { auctionId } = refundData.metadata || {}
-
-    if (!auctionId) {
-      console.log('No auction ID in refund metadata')
-      return
-    }
-
-    // Update fulfillment dispute state
-    const { error: updateError } = await supabaseServer
-      .from('fulfillments')
-      .update({
-        dispute_state: 'REFUNDED',
-        updated_at: new Date().toISOString()
-      })
-      .eq('auction_id', auctionId)
-
-    if (updateError) {
-      console.error('Error updating fulfillment dispute state:', updateError)
-    }
-
-    console.log('Refund updated processing completed')
-  } catch (error) {
-    console.error('Error handling refund updated:', error)
+    console.error('Error handling payment.succeeded:', error)
   }
 }

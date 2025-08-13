@@ -161,6 +161,7 @@ export function AuctionCard({
                         startTime={auction.starts_at}
                         playSound={false}
                         auctionStatus={auction.status}
+                        antiSnipeSec={auction.anti_snipe_sec}
                       />
                     </div>
 

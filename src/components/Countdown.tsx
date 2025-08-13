@@ -13,6 +13,7 @@ interface CountdownProps {
   variant?: 'default' | 'critical' | 'warning' | 'success'
   playSound?: boolean // New prop to control sound playing
   auctionStatus?: string // New prop to check auction status
+  antiSnipeSec?: number // Anti-snipe window in seconds
 }
 
 export function Countdown({ 
@@ -22,7 +23,8 @@ export function Countdown({
   className, 
   variant = 'default',
   playSound = false,
-  auctionStatus = 'LIVE'
+  auctionStatus = 'LIVE',
+  antiSnipeSec = 120
 }: CountdownProps) {
   const [timeLeft, setTimeLeft] = useState<{
     days: number
@@ -33,6 +35,8 @@ export function Countdown({
   const [isEnded, setIsEnded] = useState(false)
   const [isScheduled, setIsScheduled] = useState(false)
   const [pulseIntensity, setPulseIntensity] = useState(1)
+  const [isAntiSnipeActive, setIsAntiSnipeActive] = useState(false)
+  const [antiSnipeTimeLeft, setAntiSnipeTimeLeft] = useState(0)
   const soundPlayedRef = useRef(false) // Track if sound has been played
 
   useEffect(() => {
@@ -83,6 +87,16 @@ export function Countdown({
         if (playSound && minutes === 0 && seconds <= 10 && !soundPlayedRef.current) {
           SoundManager.playAuctionEnding()
           soundPlayedRef.current = true
+        }
+
+        // Check if anti-snipe window is active
+        const antiSnipeWindow = antiSnipeSec * 1000 // Convert to milliseconds
+        if (difference <= antiSnipeWindow && difference > 0) {
+          setIsAntiSnipeActive(true)
+          setAntiSnipeTimeLeft(Math.ceil(difference / 1000))
+        } else {
+          setIsAntiSnipeActive(false)
+          setAntiSnipeTimeLeft(0)
         }
 
         // Increase pulse intensity as time runs out
@@ -229,8 +243,23 @@ export function Countdown({
           )}
         </div>
 
+        {/* Anti-Snipe Warning */}
+        {isAntiSnipeActive && (
+          <div className="mt-2 bg-yellow-500/20 border border-yellow-500/50 rounded px-2 py-1">
+            <div className="flex items-center justify-center gap-1">
+              <Zap className="h-3 w-3 text-yellow-400" />
+              <span className="text-xs font-bold text-yellow-300">
+                ANTI-SNIPE: {antiSnipeTimeLeft}s LEFT
+              </span>
+            </div>
+            <div className="text-xs text-yellow-200 mt-1">
+              Auction extends if bid placed
+            </div>
+          </div>
+        )}
+
         {/* Progress Bar for last 5 minutes */}
-        {timeLeft.minutes <= 5 && (
+        {timeLeft.minutes <= 5 && !isAntiSnipeActive && (
           <div className="mt-1 w-full bg-black/20 rounded-full h-1">
             <div 
               className="bg-white h-1 rounded-full transition-all duration-1000 ease-out"

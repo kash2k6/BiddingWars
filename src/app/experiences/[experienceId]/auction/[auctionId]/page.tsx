@@ -549,6 +549,7 @@ export default function AuctionDetailPage() {
                         className="text-lg" 
                         playSound={true}
                         auctionStatus={auction.status}
+                        antiSnipeSec={auction.anti_snipe_sec}
                       />
                     </div>
                   </div>

@@ -24,22 +24,17 @@ export async function POST(request: NextRequest) {
     const amountInDollars = amount / 100
     console.log('Converting amount from cents to dollars:', { cents: amount, dollars: amountInDollars })
 
-    // Use deep linking to the main app page
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://bidding-wars-cyowxb5ih-kash2k6s-projects.vercel.app'
-    const redirectUrl = `${baseUrl}/experiences/${experienceId}?payment_success=true&type=${metadata?.type || 'payment'}&auctionId=${metadata?.auctionId || ''}`
-
-    console.log('Using deep link redirect URL:', redirectUrl)
-    
+    // For in-app purchases, we don't need a redirect URL - the modal handles the flow
     const chargeParams: any = {
       amount: amountInDollars,
       currency: currency,
       userId: actualUserId,
-      redirectUrl: redirectUrl,
       // metadata is information that you'd like to receive later about the payment.
       metadata: {
         experienceId: experienceId,
         auctionId: metadata?.auctionId,
         type: metadata?.type,
+        barracksItemId: metadata?.barracksItemId,
         ...metadata
       },
     }

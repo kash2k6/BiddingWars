@@ -1,9 +1,9 @@
-import { IframeSdk } from '@whop/iframe'
+import { createSdk } from '@whop/iframe'
 
-let iframeSdk: IframeSdk | null = null
+let iframeSdk: any = null
 
 // Initialize the iframe SDK
-async function getIframeSdk(): Promise<IframeSdk> {
+async function getIframeSdk(): Promise<any> {
   if (iframeSdk) {
     return iframeSdk
   }
@@ -13,8 +13,9 @@ async function getIframeSdk(): Promise<IframeSdk> {
   }
 
   try {
-    iframeSdk = new IframeSdk()
-    await iframeSdk.init()
+    iframeSdk = createSdk({
+      appId: process.env.NEXT_PUBLIC_WHOP_APP_ID || 'test-app-id',
+    })
     console.log('Iframe SDK initialized successfully')
     return iframeSdk
   } catch (error) {
@@ -29,9 +30,22 @@ export async function getIframeContext() {
     console.log('Getting iframe context...')
     
     const sdk = await getIframeSdk()
-    const context = await sdk.getContext()
+    const urlData = await sdk.getTopLevelUrlData()
     
-    console.log('Iframe context received:', context)
+    console.log('Iframe URL data received:', urlData)
+    
+    // Extract user context from the URL data
+    // The experienceId is available directly from the URL data
+    const experienceId = urlData.experienceId
+    
+    // For now, use the server API to get the full context since we need userId and companyId
+    const response = await fetch('/api/whop-context')
+    if (!response.ok) {
+      throw new Error('Failed to get context from server')
+    }
+    
+    const context = await response.json()
+    console.log("Context received from server:", context)
     return context
   } catch (error) {
     console.error('Failed to get iframe context:', error)
@@ -72,7 +86,11 @@ export async function createInAppPurchase(inAppPurchaseData: any) {
     const sdk = await getIframeSdk()
     
     // Use the proper iframe SDK method for in-app purchases
-    const result = await sdk.inAppPurchase(inAppPurchaseData)
+    // The SDK expects { planId: string, id?: string }
+    const result = await sdk.inAppPurchase({
+      planId: inAppPurchaseData.planId,
+      id: inAppPurchaseData.id
+    })
     
     console.log('In-app purchase result:', result)
     
@@ -107,28 +125,5 @@ export async function createInAppPurchase(inAppPurchaseData: any) {
   }
 }
 
-// Function to open purchase modal (alternative method)
-export async function openPurchaseModal(planId: string, options?: {
-  onSuccess?: () => void
-  onError?: (error: any) => void
-  onClose?: () => void
-}) {
-  try {
-    console.log('Opening purchase modal for plan:', planId)
-    
-    const sdk = await getIframeSdk()
-    
-    const result = await sdk.openPurchaseModal({
-      planId,
-      onSuccess: options?.onSuccess,
-      onError: options?.onError,
-      onClose: options?.onClose
-    })
-    
-    console.log('Purchase modal result:', result)
-    return result
-  } catch (error) {
-    console.error('Failed to open purchase modal:', error)
-    throw error
-  }
-}
+// Note: openPurchaseModal is not available in the current @whop/iframe SDK
+// Use createInAppPurchase instead for payment flows

@@ -118,18 +118,5 @@ export async function createInAppPurchase(inAppPurchaseData: any) {
   }
 }
 
-// Function to open purchase modal (alternative method)
-export async function openPurchaseModal(planId: string, options?: {
-  onSuccess?: () => void
-  onError?: (error: any) => void
-  onClose?: () => void
-}) {
-  try {
-    const { openPurchaseModal: openPurchaseModalFromSDK } = await import('@/lib/whop-iframe')
-    const result = await openPurchaseModalFromSDK(planId, options)
-    return result
-  } catch (error) {
-    console.error('Failed to open purchase modal:', error)
-    throw error
-  }
-}
+// Note: openPurchaseModal is not available in the current @whop/iframe SDK
+// Use createInAppPurchase instead for payment flows

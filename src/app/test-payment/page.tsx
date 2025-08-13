@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
-import { getIframeContext, createInAppPurchase, openPurchaseModal } from "@/lib/whop-client"
+import { getIframeContext, createInAppPurchase } from "@/lib/whop-client"
 
 export default function TestPaymentPage() {
   const [loading, setLoading] = useState(false)
@@ -161,29 +161,15 @@ export default function TestPaymentPage() {
         return
       }
       
-      // Then test the purchase modal
-      const res = await openPurchaseModal(chargeResult.charge.planId, {
-        onSuccess: () => {
-          addResult("✅ Purchase modal success callback triggered")
-          toast({
-            title: "Purchase Modal Success",
-            description: "Purchase modal completed successfully",
-          })
-        },
-        onError: (error: any) => {
-          addResult(`❌ Purchase modal error callback: ${error?.message || 'Unknown error'}`)
-          toast({
-            title: "Purchase Modal Error",
-            description: error?.message || 'Unknown error',
-            variant: "destructive",
-          })
-        },
-        onClose: () => {
-          addResult("ℹ️ Purchase modal closed")
-        }
-      })
+      // Note: openPurchaseModal is not available in the current @whop/iframe SDK
+      addResult("❌ Note: openPurchaseModal is not available in the current @whop/iframe SDK")
+      addResult("ℹ️ Use createInAppPurchase instead for payment flows")
       
-      addResult(`ℹ️ Purchase modal opened: ${JSON.stringify(res, null, 2)}`)
+      toast({
+        title: "Not Available",
+        description: "openPurchaseModal is not available in the current SDK. Use createInAppPurchase instead.",
+        variant: "destructive",
+      })
       
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error'

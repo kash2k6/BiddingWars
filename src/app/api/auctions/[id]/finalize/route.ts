@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
 import { 
   chargeUserForAuction, 
-  calculateCommissionBreakdown, 
-  processPayouts 
+  calculateCommissionBreakdown
 } from '@/lib/payment-system'
 import { WhopServerSdk } from '@whop/api'
 
@@ -122,7 +121,8 @@ export async function POST(
         auctionId: params.id,
         experienceId,
         bidId,
-        breakdown
+        breakdown,
+        type: buyNow ? 'buy_now' : 'auction_win'
       }
     })
 

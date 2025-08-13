@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency } from "@/lib/payouts"
 import { DollarSign, CheckCircle, XCircle, Loader2 } from "lucide-react"
-import { getIframeContext, createInAppPurchase, openPurchaseModal } from "@/lib/whop-client"
+import { getIframeContext, createInAppPurchase } from "@/lib/whop-client"
 
 interface PaymentHandlerProps {
   auctionId: string
@@ -51,7 +51,8 @@ export function PaymentHandler({
           currency: 'usd',
           metadata: {
             auctionId: auctionId,
-            type: 'auction_payment'
+            type: 'auction_payment',
+            barracksItemId: auctionId // For now, we'll use auctionId as barracksItemId since we don't have it directly
           }
         }),
       })
@@ -103,93 +104,8 @@ export function PaymentHandler({
     }
   }
 
-  // Alternative payment method using purchase modal
-  const handlePaymentWithModal = async () => {
-    if (disabled || loading) return
-
-    setLoading(true)
-    setPaymentStatus('processing')
-    setError(undefined)
-
-    try {
-      // Get the current Whop context
-      const context = await getIframeContext()
-
-      // 1. Create charge on server
-      const response = await fetch("/api/charge", {
-        method: "POST",
-        body: JSON.stringify({ 
-          userId: context.userId, 
-          experienceId: context.experienceId,
-          amount: amount,
-          currency: 'usd',
-          metadata: {
-            auctionId: auctionId,
-            type: 'auction_payment'
-          }
-        }),
-      })
-      
-      if (response.ok) {
-        const chargeResult = await response.json()
-        console.log('Charge created successfully:', chargeResult)
-        
-        // 2. Open purchase modal with the plan ID
-        const res = await openPurchaseModal(chargeResult.charge.planId, {
-          onSuccess: () => {
-            setPaymentStatus('success')
-            setError(undefined)
-            
-            toast({
-              title: "Payment Successful! 🎉",
-              description: "Your payment has been processed successfully.",
-            })
-            
-            onSuccess?.()
-          },
-          onError: (error: any) => {
-            console.error('Payment modal error:', error)
-            setPaymentStatus('failed')
-            setError(error?.message || 'Payment failed')
-            
-            toast({
-              title: "Payment Failed",
-              description: error?.message || 'Payment failed',
-              variant: "destructive",
-            })
-            
-            onError?.(error?.message || 'Payment failed')
-          },
-          onClose: () => {
-            console.log('Payment modal closed')
-            if (paymentStatus === 'processing') {
-              setPaymentStatus('idle')
-            }
-          }
-        })
-        
-        console.log('Purchase modal result:', res)
-      } else {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to create charge")
-      }
-    } catch (error) {
-      console.error('Payment error:', error)
-      setPaymentStatus('failed')
-      const errorMessage = error instanceof Error ? error.message : 'Payment failed'
-      setError(errorMessage)
-      
-      toast({
-        title: "Payment Failed",
-        description: errorMessage,
-        variant: "destructive",
-      })
-      
-      onError?.(errorMessage)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Note: openPurchaseModal is not available in the current @whop/iframe SDK
+  // Use handlePayment instead for payment flows
 
   const getButtonContent = () => {
     if (loading) {
