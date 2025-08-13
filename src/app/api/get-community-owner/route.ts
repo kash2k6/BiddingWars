@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     
     console.log('✅ Experience found:', {
       id: experience.id,
-      title: experience.title,
+      name: experience.name,
       companyId: experience.company.id,
       companyName: experience.company.title
     })
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       success: true,
       communityOwner: {
         experienceId: experience.id,
-        experienceTitle: experience.title,
+        experienceTitle: experience.name,
         companyId: experience.company.id,
         companyName: experience.company.title,
         // The community owner is the company owner
