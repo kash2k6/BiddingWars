@@ -221,6 +221,10 @@ export default function AuctionDetailPage() {
   const handleBid = async () => {
     if (!auction || !currentUserId) return
 
+    // Calculate the minimum bid amount
+    const currentBid = bids.length > 0 ? Math.max(...bids.map(bid => bid.amount_cents)) : auction.start_price_cents
+    const minBidAmount = currentBid + auction.min_increment_cents
+
     try {
       const response = await fetch(`/api/auctions/${auction.id}/bid`, {
         method: 'POST',
@@ -228,7 +232,7 @@ export default function AuctionDetailPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          amountCents: newBidAmount,
+          amountCents: minBidAmount,
           userId: currentUserId,
           experienceId: auction.experience_id,
           companyId: undefined,
@@ -243,18 +247,18 @@ export default function AuctionDetailPage() {
 
       toast({
         title: "Bid Placed!",
-        description: `Your bid of ${formatCurrency(newBidAmount)} has been placed successfully.`,
+        description: `Your bid of ${formatCurrency(minBidAmount)} has been placed successfully.`,
       })
 
       // Update local state
       const newBid: Bid = {
         id: result.id,
-        amount_cents: newBidAmount,
+        amount_cents: minBidAmount,
         bidder_user_id: currentUserId,
         created_at: new Date().toISOString(),
       }
       setBids(prev => [newBid, ...prev])
-      setNewBidAmount(newBidAmount + auction.min_increment_cents)
+      setNewBidAmount(minBidAmount + auction.min_increment_cents)
 
     } catch (error) {
       console.error('Error placing bid:', error)
