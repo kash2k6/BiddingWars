@@ -44,10 +44,8 @@ export default function AuctionChat({
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Show chat for all users - removed the restriction
-  // if (!isWinner && !isSeller) {
-  //   return null
-  // }
+  // Show chat for everyone participating in the auction
+  // No restrictions - all users can participate in the chat
 
   useEffect(() => {
     console.log('Chat component mounted for auction:', auctionId)
