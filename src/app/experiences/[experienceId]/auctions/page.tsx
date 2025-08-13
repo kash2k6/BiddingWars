@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { supabaseClient } from "@/lib/supabase-client"
 import { formatCurrency } from "@/lib/payouts"
 import { Package, Clock, CheckCircle, Truck, DollarSign, Trophy } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface Auction {
   id: string
@@ -32,6 +33,7 @@ interface Auction {
 
 export default function MyAuctionsPage({ params }: { params: { experienceId: string } }) {
   const router = useRouter()
+  const { toast } = useToast()
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [auctions, setAuctions] = useState<Auction[]>([])
   const [pastAuctions, setPastAuctions] = useState<Auction[]>([])
@@ -196,8 +198,43 @@ export default function MyAuctionsPage({ params }: { params: { experienceId: str
   }
 
   const handleEndEarly = async (auctionId: string) => {
-    // This would call an API to end the auction early
-    console.log('End auction early:', auctionId)
+    try {
+      console.log('🚀 Ending auction early:', auctionId)
+      
+      const response = await fetch(`/api/auctions/${auctionId}/end`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const result = await response.json()
+      console.log('📞 End auction response:', result)
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to end auction')
+      }
+
+      console.log('✅ Auction ended successfully!')
+      
+      // Show success message
+      toast({
+        title: "Auction Ended! 🎉",
+        description: result.winner 
+          ? `Auction ended with winner: ${result.winner.slice(-8)}` 
+          : "Auction ended with no bids",
+      })
+
+      // Refresh the page to update the UI
+      window.location.reload()
+    } catch (error) {
+      console.error('❌ Error ending auction:', error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to end auction',
+        variant: "destructive",
+      })
+    }
   }
 
   const handleEditAuction = async (auctionId: string) => {
